@@ -217,7 +217,7 @@ export default function TransactionsList() {
               <div>
                 <p className="text-sm text-muted-foreground">إجمالي المشتريات</p>
                 <p className="text-xl font-bold text-red-600 dark:text-red-400">
-                  {totalDebit.toLocaleString('ar-SA')} ر.س
+                  {totalDebit.toLocaleString('ar-IQ')} د.ع
                 </p>
               </div>
             </div>
@@ -232,7 +232,7 @@ export default function TransactionsList() {
               <div>
                 <p className="text-sm text-muted-foreground">إجمالي المدفوعات</p>
                 <p className="text-xl font-bold text-green-600 dark:text-green-400">
-                  {totalCredit.toLocaleString('ar-SA')} ر.س
+                  {totalCredit.toLocaleString('ar-IQ')} د.ع
                 </p>
               </div>
             </div>
@@ -318,7 +318,7 @@ export default function TransactionsList() {
                           <span className={`font-semibold ${
                             isCredit ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
                           }`}>
-                            {isCredit ? '-' : '+'}{transaction.amount.toLocaleString('ar-SA')} ر.س
+                            {isCredit ? '-' : '+'}{transaction.amount.toLocaleString('ar-IQ')} د.ع
                           </span>
                         </TableCell>
                         <TableCell className="hidden md:table-cell text-muted-foreground max-w-[200px] truncate">

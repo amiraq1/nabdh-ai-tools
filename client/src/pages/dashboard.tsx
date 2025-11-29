@@ -108,7 +108,7 @@ function RecentTransactionRow({ transaction, supplierName }: { transaction: Tran
       </div>
       <div className="text-left">
         <p className={`text-sm font-semibold ${isCredit ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-          {isCredit ? '-' : '+'}{transaction.amount.toLocaleString('ar-SA')} ر.س
+          {isCredit ? '-' : '+'}{transaction.amount.toLocaleString('ar-IQ')} د.ع
         </p>
         <p className="text-xs text-muted-foreground">{transaction.date}</p>
       </div>
@@ -186,21 +186,21 @@ export default function Dashboard() {
         />
         <StatCard
           title="إجمالي الرصيد"
-          value={`${totalBalance.toLocaleString('ar-SA')} ر.س`}
+          value={`${totalBalance.toLocaleString('ar-IQ')} د.ع`}
           subtitle="الرصيد الكلي"
           icon={Wallet}
           isLoading={isLoading}
         />
         <StatCard
           title="رصيد لنا"
-          value={`${positiveBalance.toLocaleString('ar-SA')} ر.س`}
+          value={`${positiveBalance.toLocaleString('ar-IQ')} د.ع`}
           subtitle="مستحقات للتحصيل"
           icon={TrendingUp}
           isLoading={isLoading}
         />
         <StatCard
           title="رصيد علينا"
-          value={`${negativeBalance.toLocaleString('ar-SA')} ر.س`}
+          value={`${negativeBalance.toLocaleString('ar-IQ')} د.ع`}
           subtitle="مستحقات للدفع"
           icon={TrendingDown}
           isLoading={isLoading}
@@ -241,7 +241,7 @@ export default function Dashboard() {
                           borderRadius: '8px',
                           direction: 'rtl'
                         }}
-                        formatter={(value: number) => [`${value.toLocaleString('ar-SA')} ر.س`]}
+                        formatter={(value: number) => [`${value.toLocaleString('ar-IQ')} د.ع`]}
                         labelFormatter={(label) => `شهر ${label}`}
                       />
                       <Legend 
@@ -303,7 +303,7 @@ export default function Dashboard() {
                           direction: 'rtl'
                         }}
                         formatter={(value: number, name: string, props: any) => [
-                          `${value} مورد - رصيد: ${props.payload.balance.toLocaleString('ar-SA')} ر.س`,
+                          `${value} مورد - رصيد: ${props.payload.balance.toLocaleString('ar-IQ')} د.ع`,
                           props.payload.name
                         ]}
                       />
@@ -415,7 +415,7 @@ export default function Dashboard() {
                           ? 'text-green-600 dark:text-green-400' 
                           : 'text-red-600 dark:text-red-400'
                       }`}>
-                        {(supplier.balance || 0).toLocaleString('ar-SA')} ر.س
+                        {(supplier.balance || 0).toLocaleString('ar-IQ')} د.ع
                       </div>
                     </Link>
                   ))}

@@ -10,9 +10,9 @@ declare module "jspdf" {
 }
 
 const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat("ar-SA", {
+  return new Intl.NumberFormat("ar-IQ", {
     style: "currency",
-    currency: "SAR",
+    currency: "IQD",
     minimumFractionDigits: 0,
   }).format(amount);
 };

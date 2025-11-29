@@ -169,7 +169,7 @@ export default function TransactionFormWithSupplier({
           name="amount"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>المبلغ (ر.س) *</FormLabel>
+              <FormLabel>المبلغ (د.ع) *</FormLabel>
               <FormControl>
                 <Input
                   type="number"

@@ -278,7 +278,7 @@ export default function SuppliersList() {
                             ? 'text-green-600 dark:text-green-400' 
                             : 'text-red-600 dark:text-red-400'
                         }`}>
-                          {(supplier.balance || 0).toLocaleString('ar-SA')} ر.س
+                          {(supplier.balance || 0).toLocaleString('ar-IQ')} د.ع
                         </span>
                       </TableCell>
                       <TableCell>

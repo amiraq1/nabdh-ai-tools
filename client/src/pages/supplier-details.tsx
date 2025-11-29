@@ -310,7 +310,7 @@ export default function SupplierDetails() {
               <div className={`text-2xl font-bold text-center ${
                 balance >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
               }`} data-testid="text-balance">
-                {balance.toLocaleString('ar-SA')} ر.س
+                {balance.toLocaleString('ar-IQ')} د.ع
               </div>
               <p className="text-xs text-center text-muted-foreground mt-1">
                 {balance >= 0 ? 'رصيد لنا' : 'رصيد علينا'}
@@ -471,7 +471,7 @@ function TransactionsTable({ transactions, isLoading }: { transactions: Transact
                   <span className={`font-semibold ${
                     isCredit ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
                   }`}>
-                    {isCredit ? '-' : '+'}{transaction.amount.toLocaleString('ar-SA')} ر.س
+                    {isCredit ? '-' : '+'}{transaction.amount.toLocaleString('ar-IQ')} د.ع
                   </span>
                 </TableCell>
                 <TableCell className="hidden sm:table-cell text-muted-foreground">
