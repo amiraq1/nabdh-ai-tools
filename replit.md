@@ -6,9 +6,17 @@ This is an Arabic-language (RTL) supplier and balance management system built wi
 
 The system follows Material Design principles adapted for Arabic RTL interfaces, prioritizing data clarity, operational efficiency, and scan-ability for daily business operations.
 
+## Recent Changes (November 2025)
+
+- **Currency**: Changed from Saudi Riyal (SAR/ر.س) to Iraqi Dinar (IQD/د.ع)
+- **Google Drive Integration**: Added automatic backup functionality to Google Drive managed by عمار محمد
+- **Authentication**: Replit Auth with role-based access control (admin/editor/viewer)
+
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
+Currency: Iraqi Dinar (IQD/د.ع)
+Locale: ar-IQ for number formatting
 
 ## System Architecture
 

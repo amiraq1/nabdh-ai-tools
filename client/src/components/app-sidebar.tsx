@@ -4,7 +4,8 @@ import {
   Receipt, 
   PlusCircle,
   Building2,
-  Shield
+  Shield,
+  CloudUpload
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
@@ -49,6 +50,11 @@ const adminItems = [
     title: "إدارة المستخدمين",
     url: "/users",
     icon: Shield,
+  },
+  {
+    title: "النسخ الاحتياطي",
+    url: "/backup",
+    icon: CloudUpload,
   },
 ];
 

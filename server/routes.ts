@@ -4,6 +4,13 @@ import { storage } from "./storage";
 import { insertSupplierSchema, insertTransactionSchema } from "@shared/schema";
 import { z } from "zod";
 import { setupAuth, isAuthenticated, requireRole } from "./replitAuth";
+import { 
+  uploadBackupToGoogleDrive, 
+  listBackups, 
+  downloadBackup, 
+  deleteBackup, 
+  checkGoogleDriveConnection 
+} from "./googleDrive";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -172,6 +179,61 @@ export async function registerRoutes(
       res.status(204).send();
     } catch (error) {
       res.status(500).json({ error: "Failed to delete transaction" });
+    }
+  });
+
+  app.get("/api/google-drive/status", isAuthenticated, requireRole(["admin"]), async (_req, res) => {
+    try {
+      const status = await checkGoogleDriveConnection();
+      res.json(status);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to check Google Drive status" });
+    }
+  });
+
+  app.get("/api/google-drive/backups", isAuthenticated, requireRole(["admin"]), async (_req, res) => {
+    try {
+      const backups = await listBackups();
+      res.json(backups);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to list backups" });
+    }
+  });
+
+  app.post("/api/google-drive/backup", isAuthenticated, requireRole(["admin"]), async (_req, res) => {
+    try {
+      const suppliers = await storage.getSuppliers();
+      const transactions = await storage.getTransactions();
+      const users = await storage.getUsers();
+      
+      const result = await uploadBackupToGoogleDrive({
+        suppliers,
+        transactions,
+        users,
+      });
+      
+      res.json(result);
+    } catch (error) {
+      console.error("Backup error:", error);
+      res.status(500).json({ error: "Failed to create backup" });
+    }
+  });
+
+  app.get("/api/google-drive/backups/:fileId", isAuthenticated, requireRole(["admin"]), async (req, res) => {
+    try {
+      const backup = await downloadBackup(req.params.fileId);
+      res.json(backup);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to download backup" });
+    }
+  });
+
+  app.delete("/api/google-drive/backups/:fileId", isAuthenticated, requireRole(["admin"]), async (req, res) => {
+    try {
+      await deleteBackup(req.params.fileId);
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete backup" });
     }
   });
 

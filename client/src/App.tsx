@@ -15,6 +15,7 @@ import SupplierForm from "@/pages/supplier-form";
 import SupplierDetails from "@/pages/supplier-details";
 import TransactionsList from "@/pages/transactions-list";
 import UsersManagement from "@/pages/users-management";
+import GoogleDriveBackup from "@/pages/google-drive-backup";
 import Landing from "@/pages/landing";
 import NotFound from "@/pages/not-found";
 import { Loader2 } from "lucide-react";
@@ -30,6 +31,7 @@ function AuthenticatedRouter() {
       <Route path="/suppliers/:id/edit" component={SupplierForm} />
       <Route path="/transactions" component={TransactionsList} />
       <Route path="/users" component={UsersManagement} />
+      <Route path="/backup" component={GoogleDriveBackup} />
       <Route component={NotFound} />
     </Switch>
   );
