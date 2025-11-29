@@ -39,8 +39,18 @@ import {
   Users,
   Phone,
   Mail,
-  Filter
+  Filter,
+  Download,
+  FileSpreadsheet,
+  FileText
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { exportSuppliersToExcel, exportSuppliersToPDF } from "@/lib/export-utils";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
@@ -142,12 +152,38 @@ export default function SuppliersList() {
             إدارة بيانات الموردين وأرصدتهم ({suppliers.length} مورد)
           </p>
         </div>
-        <Button asChild>
-          <Link href="/suppliers/new" data-testid="button-add-supplier">
-            <PlusCircle className="h-4 w-4 ml-2" />
-            إضافة مورد
-          </Link>
-        </Button>
+        <div className="flex gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" disabled={suppliers.length === 0} data-testid="button-export">
+                <Download className="h-4 w-4 ml-2" />
+                تصدير
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem 
+                onClick={() => exportSuppliersToExcel(suppliers)}
+                data-testid="button-export-excel"
+              >
+                <FileSpreadsheet className="h-4 w-4 ml-2" />
+                تصدير Excel
+              </DropdownMenuItem>
+              <DropdownMenuItem 
+                onClick={() => exportSuppliersToPDF(suppliers)}
+                data-testid="button-export-pdf"
+              >
+                <FileText className="h-4 w-4 ml-2" />
+                تصدير PDF
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Button asChild>
+            <Link href="/suppliers/new" data-testid="button-add-supplier">
+              <PlusCircle className="h-4 w-4 ml-2" />
+              إضافة مورد
+            </Link>
+          </Button>
+        </div>
       </div>
 
       <Card>

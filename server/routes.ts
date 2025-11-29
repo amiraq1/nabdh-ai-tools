@@ -3,13 +3,55 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertSupplierSchema, insertTransactionSchema } from "@shared/schema";
 import { z } from "zod";
+import { setupAuth, isAuthenticated, requireRole } from "./replitAuth";
 
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
   
-  app.get("/api/suppliers", async (_req, res) => {
+  await setupAuth(app);
+
+  app.get("/api/auth/user", async (req: any, res) => {
+    try {
+      if (!req.isAuthenticated() || !req.user?.claims?.sub) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      res.json(user);
+    } catch (error) {
+      console.error("Error fetching user:", error);
+      res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
+  app.get("/api/users", isAuthenticated, requireRole(["admin"]), async (_req, res) => {
+    try {
+      const users = await storage.getUsers();
+      res.json(users);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch users" });
+    }
+  });
+
+  app.patch("/api/users/:id/role", isAuthenticated, requireRole(["admin"]), async (req, res) => {
+    try {
+      const { role } = req.body;
+      if (!["admin", "editor", "viewer"].includes(role)) {
+        return res.status(400).json({ error: "Invalid role" });
+      }
+      const user = await storage.updateUserRole(req.params.id, role);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      res.json(user);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update user role" });
+    }
+  });
+
+  app.get("/api/suppliers", isAuthenticated, async (_req, res) => {
     try {
       const suppliers = await storage.getSuppliers();
       res.json(suppliers);
@@ -18,7 +60,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/suppliers/:id", async (req, res) => {
+  app.get("/api/suppliers/:id", isAuthenticated, async (req, res) => {
     try {
       const supplier = await storage.getSupplier(req.params.id);
       if (!supplier) {
@@ -30,7 +72,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/suppliers", async (req, res) => {
+  app.post("/api/suppliers", isAuthenticated, requireRole(["admin", "editor"]), async (req, res) => {
     try {
       const validatedData = insertSupplierSchema.parse(req.body);
       const supplier = await storage.createSupplier(validatedData);
@@ -43,7 +85,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/suppliers/:id", async (req, res) => {
+  app.patch("/api/suppliers/:id", isAuthenticated, requireRole(["admin", "editor"]), async (req, res) => {
     try {
       const validatedData = insertSupplierSchema.partial().parse(req.body);
       const supplier = await storage.updateSupplier(req.params.id, validatedData);
@@ -59,7 +101,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/suppliers/:id", async (req, res) => {
+  app.delete("/api/suppliers/:id", isAuthenticated, requireRole(["admin"]), async (req, res) => {
     try {
       await storage.deleteTransactionsBySupplier(req.params.id);
       const deleted = await storage.deleteSupplier(req.params.id);
@@ -72,7 +114,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/transactions", async (_req, res) => {
+  app.get("/api/transactions", isAuthenticated, async (_req, res) => {
     try {
       const transactions = await storage.getTransactions();
       res.json(transactions);
@@ -81,7 +123,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/transactions/:id", async (req, res) => {
+  app.get("/api/transactions/:id", isAuthenticated, async (req, res) => {
     try {
       const transaction = await storage.getTransaction(req.params.id);
       if (!transaction) {
@@ -93,7 +135,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/suppliers/:id/transactions", async (req, res) => {
+  app.get("/api/suppliers/:id/transactions", isAuthenticated, async (req, res) => {
     try {
       const transactions = await storage.getTransactionsBySupplier(req.params.id);
       res.json(transactions);
@@ -102,7 +144,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/transactions", async (req, res) => {
+  app.post("/api/transactions", isAuthenticated, requireRole(["admin", "editor"]), async (req, res) => {
     try {
       const validatedData = insertTransactionSchema.parse(req.body);
       
@@ -121,7 +163,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/transactions/:id", async (req, res) => {
+  app.delete("/api/transactions/:id", isAuthenticated, requireRole(["admin"]), async (req, res) => {
     try {
       const deleted = await storage.deleteTransaction(req.params.id);
       if (!deleted) {

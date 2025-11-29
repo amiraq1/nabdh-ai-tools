@@ -44,8 +44,18 @@ import {
   ArrowDownRight,
   Wallet,
   Calendar,
-  Building2
+  Building2,
+  Download,
+  FileSpreadsheet
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { exportSupplierReportToPDF } from "@/lib/export-utils";
+import * as XLSX from "xlsx";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useLocation, useParams } from "wouter";
 import { useToast } from "@/hooks/use-toast";
@@ -185,7 +195,42 @@ export default function SupplierDetails() {
             <Badge variant="secondary" className="mt-1">{supplier.category}</Badge>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" data-testid="button-export-supplier">
+                <Download className="h-4 w-4 ml-2" />
+                تصدير كشف الحساب
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem 
+                onClick={() => {
+                  const data = transactions.map((t) => ({
+                    "التاريخ": t.date,
+                    "النوع": t.type === "debit" ? "مشتريات (له)" : "دفعة (منه)",
+                    "المبلغ": t.amount,
+                    "الوصف": t.description || "-",
+                  }));
+                  const ws = XLSX.utils.json_to_sheet(data);
+                  const wb = XLSX.utils.book_new();
+                  XLSX.utils.book_append_sheet(wb, ws, "كشف الحساب");
+                  XLSX.writeFile(wb, `كشف_حساب_${supplier.name}.xlsx`);
+                }}
+                data-testid="button-export-supplier-excel"
+              >
+                <FileSpreadsheet className="h-4 w-4 ml-2" />
+                تصدير Excel
+              </DropdownMenuItem>
+              <DropdownMenuItem 
+                onClick={() => exportSupplierReportToPDF(supplier, transactions)}
+                data-testid="button-export-supplier-pdf"
+              >
+                <FileText className="h-4 w-4 ml-2" />
+                تصدير PDF
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Dialog open={isTransactionDialogOpen} onOpenChange={setIsTransactionDialogOpen}>
             <DialogTrigger asChild>
               <Button onClick={() => setTransactionType("debit")} data-testid="button-add-transaction">

@@ -34,8 +34,18 @@ import {
   ArrowDownRight,
   Receipt,
   Filter,
-  Calendar
+  Calendar,
+  Download,
+  FileSpreadsheet,
+  FileText
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { exportTransactionsToExcel, exportTransactionsToPDF } from "@/lib/export-utils";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { queryClient } from "@/lib/queryClient";
@@ -135,27 +145,53 @@ export default function TransactionsList() {
             سجل جميع المعاملات المالية ({transactions.length} معاملة)
           </p>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button data-testid="button-add-transaction">
-              <PlusCircle className="h-4 w-4 ml-2" />
-              إضافة معاملة
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle>إضافة معاملة جديدة</DialogTitle>
-              <DialogDescription>
-                أضف معاملة مالية جديدة لأحد الموردين
-              </DialogDescription>
-            </DialogHeader>
-            <TransactionFormWithSupplier
-              suppliers={suppliers}
-              onSuccess={handleTransactionSuccess}
-              onCancel={() => setIsDialogOpen(false)}
-            />
-          </DialogContent>
-        </Dialog>
+        <div className="flex gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" disabled={transactions.length === 0} data-testid="button-export-transactions">
+                <Download className="h-4 w-4 ml-2" />
+                تصدير
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem 
+                onClick={() => exportTransactionsToExcel(transactions, suppliers)}
+                data-testid="button-export-transactions-excel"
+              >
+                <FileSpreadsheet className="h-4 w-4 ml-2" />
+                تصدير Excel
+              </DropdownMenuItem>
+              <DropdownMenuItem 
+                onClick={() => exportTransactionsToPDF(transactions, suppliers)}
+                data-testid="button-export-transactions-pdf"
+              >
+                <FileText className="h-4 w-4 ml-2" />
+                تصدير PDF
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button data-testid="button-add-transaction">
+                <PlusCircle className="h-4 w-4 ml-2" />
+                إضافة معاملة
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>إضافة معاملة جديدة</DialogTitle>
+                <DialogDescription>
+                  أضف معاملة مالية جديدة لأحد الموردين
+                </DialogDescription>
+              </DialogHeader>
+              <TransactionFormWithSupplier
+                suppliers={suppliers}
+                onSuccess={handleTransactionSuccess}
+                onCancel={() => setIsDialogOpen(false)}
+              />
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">

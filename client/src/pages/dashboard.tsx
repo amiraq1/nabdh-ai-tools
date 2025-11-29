@@ -10,11 +10,29 @@ import {
   ArrowUpLeft,
   ArrowDownRight,
   PlusCircle,
-  Eye
+  Eye,
+  BarChart3,
+  PieChart
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import type { Supplier, Transaction } from "@shared/schema";
+import { 
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ResponsiveContainer,
+  PieChart as RechartsPieChart,
+  Pie,
+  Cell,
+  Legend,
+  LineChart,
+  Line
+} from "recharts";
+import { supplierCategories } from "@shared/schema";
 
 function StatCard({ 
   title, 
@@ -188,6 +206,119 @@ export default function Dashboard() {
           isLoading={isLoading}
         />
       </div>
+
+      {hasData && (
+        <div className="grid gap-6 lg:grid-cols-2">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-2">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <BarChart3 className="h-5 w-5 text-primary" />
+                المعاملات الشهرية
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {(() => {
+                const monthlyData = transactions.reduce((acc, t) => {
+                  const month = new Date(t.date).toLocaleDateString('ar-SA', { month: 'short' });
+                  if (!acc[month]) acc[month] = { month, debits: 0, credits: 0 };
+                  if (t.type === 'debit') acc[month].debits += t.amount;
+                  else acc[month].credits += t.amount;
+                  return acc;
+                }, {} as Record<string, { month: string; debits: number; credits: number }>);
+                
+                const chartData = Object.values(monthlyData).slice(-6);
+                
+                return chartData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={250}>
+                    <BarChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                      <XAxis dataKey="month" className="text-xs" tick={{ fill: 'currentColor' }} />
+                      <YAxis className="text-xs" tick={{ fill: 'currentColor' }} tickFormatter={(value) => `${(value/1000).toFixed(0)}ك`} />
+                      <Tooltip 
+                        contentStyle={{ 
+                          backgroundColor: 'hsl(var(--card))', 
+                          border: '1px solid hsl(var(--border))',
+                          borderRadius: '8px',
+                          direction: 'rtl'
+                        }}
+                        formatter={(value: number) => [`${value.toLocaleString('ar-SA')} ر.س`]}
+                        labelFormatter={(label) => `شهر ${label}`}
+                      />
+                      <Legend 
+                        formatter={(value) => value === 'debits' ? 'مشتريات' : 'دفعات'}
+                        wrapperStyle={{ direction: 'rtl' }}
+                      />
+                      <Bar dataKey="debits" name="debits" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="credits" name="credits" fill="hsl(142 76% 36%)" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-[250px] flex items-center justify-center text-muted-foreground">
+                    لا توجد بيانات كافية للعرض
+                  </div>
+                );
+              })()}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-2">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <PieChart className="h-5 w-5 text-primary" />
+                توزيع الموردين حسب الفئة
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {(() => {
+                const categoryData = supplierCategories.map(cat => ({
+                  name: cat,
+                  value: suppliers.filter(s => s.category === cat).length,
+                  balance: suppliers.filter(s => s.category === cat).reduce((sum, s) => sum + (s.balance || 0), 0)
+                })).filter(c => c.value > 0);
+
+                const COLORS = ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#6366f1'];
+
+                return categoryData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={250}>
+                    <RechartsPieChart>
+                      <Pie
+                        data={categoryData}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                        outerRadius={80}
+                        fill="#8884d8"
+                        dataKey="value"
+                      >
+                        {categoryData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip 
+                        contentStyle={{ 
+                          backgroundColor: 'hsl(var(--card))', 
+                          border: '1px solid hsl(var(--border))',
+                          borderRadius: '8px',
+                          direction: 'rtl'
+                        }}
+                        formatter={(value: number, name: string, props: any) => [
+                          `${value} مورد - رصيد: ${props.payload.balance.toLocaleString('ar-SA')} ر.س`,
+                          props.payload.name
+                        ]}
+                      />
+                    </RechartsPieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-[250px] flex items-center justify-center text-muted-foreground">
+                    لا توجد بيانات كافية للعرض
+                  </div>
+                );
+              })()}
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
