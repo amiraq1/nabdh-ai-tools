@@ -1,5 +1,6 @@
-import { type Supplier, type InsertSupplier, type Transaction, type InsertTransaction } from "@shared/schema";
-import { randomUUID } from "crypto";
+import { type Supplier, type InsertSupplier, type Transaction, type InsertTransaction, suppliers, transactions } from "@shared/schema";
+import { db } from "./db";
+import { eq, desc } from "drizzle-orm";
 
 export interface IStorage {
   getSuppliers(): Promise<Supplier[]>;
@@ -16,71 +17,60 @@ export interface IStorage {
   deleteTransactionsBySupplier(supplierId: string): Promise<void>;
 }
 
-export class MemStorage implements IStorage {
-  private suppliers: Map<string, Supplier>;
-  private transactions: Map<string, Transaction>;
-
-  constructor() {
-    this.suppliers = new Map();
-    this.transactions = new Map();
-  }
-
+export class DatabaseStorage implements IStorage {
   async getSuppliers(): Promise<Supplier[]> {
-    return Array.from(this.suppliers.values());
+    return await db.select().from(suppliers);
   }
 
   async getSupplier(id: string): Promise<Supplier | undefined> {
-    return this.suppliers.get(id);
+    const [supplier] = await db.select().from(suppliers).where(eq(suppliers.id, id));
+    return supplier || undefined;
   }
 
   async createSupplier(insertSupplier: InsertSupplier): Promise<Supplier> {
-    const id = randomUUID();
-    const supplier: Supplier = { 
-      ...insertSupplier, 
-      id,
-      phone: insertSupplier.phone ?? null,
-      email: insertSupplier.email ?? null,
-      address: insertSupplier.address ?? null,
-      notes: insertSupplier.notes ?? null,
-      balance: insertSupplier.balance ?? 0,
-    };
-    this.suppliers.set(id, supplier);
+    const [supplier] = await db
+      .insert(suppliers)
+      .values(insertSupplier)
+      .returning();
     return supplier;
   }
 
   async updateSupplier(id: string, updates: Partial<InsertSupplier>): Promise<Supplier | undefined> {
-    const existing = this.suppliers.get(id);
-    if (!existing) return undefined;
-    
-    const updated: Supplier = { ...existing, ...updates };
-    this.suppliers.set(id, updated);
-    return updated;
+    const [supplier] = await db
+      .update(suppliers)
+      .set(updates)
+      .where(eq(suppliers.id, id))
+      .returning();
+    return supplier || undefined;
   }
 
   async deleteSupplier(id: string): Promise<boolean> {
-    return this.suppliers.delete(id);
+    const result = await db.delete(suppliers).where(eq(suppliers.id, id)).returning();
+    return result.length > 0;
   }
 
   async getTransactions(): Promise<Transaction[]> {
-    return Array.from(this.transactions.values());
+    return await db.select().from(transactions).orderBy(desc(transactions.date));
   }
 
   async getTransaction(id: string): Promise<Transaction | undefined> {
-    return this.transactions.get(id);
+    const [transaction] = await db.select().from(transactions).where(eq(transactions.id, id));
+    return transaction || undefined;
   }
 
   async getTransactionsBySupplier(supplierId: string): Promise<Transaction[]> {
-    return Array.from(this.transactions.values()).filter(t => t.supplierId === supplierId);
+    return await db
+      .select()
+      .from(transactions)
+      .where(eq(transactions.supplierId, supplierId))
+      .orderBy(desc(transactions.date));
   }
 
   async createTransaction(insertTransaction: InsertTransaction): Promise<Transaction> {
-    const id = randomUUID();
-    const transaction: Transaction = { 
-      ...insertTransaction, 
-      id,
-      description: insertTransaction.description ?? null,
-    };
-    this.transactions.set(id, transaction);
+    const [transaction] = await db
+      .insert(transactions)
+      .values(insertTransaction)
+      .returning();
     
     const supplier = await this.getSupplier(insertTransaction.supplierId);
     if (supplier) {
@@ -96,7 +86,7 @@ export class MemStorage implements IStorage {
   }
 
   async deleteTransaction(id: string): Promise<boolean> {
-    const transaction = this.transactions.get(id);
+    const transaction = await this.getTransaction(id);
     if (!transaction) return false;
     
     const supplier = await this.getSupplier(transaction.supplierId);
@@ -109,20 +99,13 @@ export class MemStorage implements IStorage {
       });
     }
     
-    return this.transactions.delete(id);
+    const result = await db.delete(transactions).where(eq(transactions.id, id)).returning();
+    return result.length > 0;
   }
 
   async deleteTransactionsBySupplier(supplierId: string): Promise<void> {
-    const transactionsToDelete: string[] = [];
-    for (const [id, transaction] of this.transactions.entries()) {
-      if (transaction.supplierId === supplierId) {
-        transactionsToDelete.push(id);
-      }
-    }
-    for (const id of transactionsToDelete) {
-      this.transactions.delete(id);
-    }
+    await db.delete(transactions).where(eq(transactions.supplierId, supplierId));
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();
