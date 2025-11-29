@@ -54,7 +54,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { exportSupplierReportToPDF } from "@/lib/export-utils";
+import { exportSupplierReportToPDF, numberToArabicWords } from "@/lib/export-utils";
 import * as XLSX from "xlsx";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useLocation, useParams } from "wouter";
@@ -312,6 +312,9 @@ export default function SupplierDetails() {
               }`} data-testid="text-balance">
                 {balance.toLocaleString('ar-IQ')} د.ع
               </div>
+              <p className="text-xs text-center text-muted-foreground mt-1 leading-relaxed">
+                {numberToArabicWords(Math.abs(balance))}
+              </p>
               <p className="text-xs text-center text-muted-foreground mt-1">
                 {balance >= 0 ? 'رصيد لنا' : 'رصيد علينا'}
               </p>

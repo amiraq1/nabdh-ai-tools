@@ -33,10 +33,12 @@ import {
   Line
 } from "recharts";
 import { supplierCategories } from "@shared/schema";
+import { numberToArabicWords } from "@/lib/export-utils";
 
 function StatCard({ 
   title, 
   value, 
+  valueInWords,
   subtitle, 
   icon: Icon, 
   trend,
@@ -45,6 +47,7 @@ function StatCard({
 }: { 
   title: string; 
   value: string | number; 
+  valueInWords?: string;
   subtitle?: string;
   icon: React.ElementType;
   trend?: string;
@@ -65,7 +68,10 @@ function StatCard({
         ) : (
           <>
             <div className="text-2xl font-bold">{value}</div>
-            {subtitle && (
+            {valueInWords && (
+              <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{valueInWords}</p>
+            )}
+            {subtitle && !valueInWords && (
               <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>
             )}
             {trend && (
@@ -187,21 +193,21 @@ export default function Dashboard() {
         <StatCard
           title="إجمالي الرصيد"
           value={`${totalBalance.toLocaleString('ar-IQ')} د.ع`}
-          subtitle="الرصيد الكلي"
+          valueInWords={numberToArabicWords(totalBalance)}
           icon={Wallet}
           isLoading={isLoading}
         />
         <StatCard
           title="رصيد لنا"
           value={`${positiveBalance.toLocaleString('ar-IQ')} د.ع`}
-          subtitle="مستحقات للتحصيل"
+          valueInWords={numberToArabicWords(positiveBalance)}
           icon={TrendingUp}
           isLoading={isLoading}
         />
         <StatCard
           title="رصيد علينا"
           value={`${negativeBalance.toLocaleString('ar-IQ')} د.ع`}
-          subtitle="مستحقات للدفع"
+          valueInWords={numberToArabicWords(Math.abs(negativeBalance))}
           icon={TrendingDown}
           isLoading={isLoading}
         />
