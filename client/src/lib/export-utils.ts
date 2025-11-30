@@ -2,11 +2,19 @@ import jsPDF from "jspdf";
 import "jspdf-autotable";
 import * as XLSX from "xlsx";
 import type { Supplier, Transaction } from "@shared/schema";
+import AmiriFont from "./fonts/amiri-font";
 
 declare module "jspdf" {
   interface jsPDF {
     autoTable: (options: any) => jsPDF;
   }
+}
+
+// تسجيل خط Amiri العربي في jsPDF
+function setupArabicFont(doc: jsPDF): void {
+  doc.addFileToVFS("Amiri-Regular.ttf", AmiriFont);
+  doc.addFont("Amiri-Regular.ttf", "Amiri", "normal");
+  doc.setFont("Amiri");
 }
 
 const formatCurrency = (amount: number) => {
@@ -177,8 +185,8 @@ export function exportSuppliersToPDF(suppliers: Supplier[], filename = "المو
     format: "a4",
   });
 
-  doc.addFont("https://fonts.gstatic.com/s/ibmplexsansarabic/v12/Qw3CZRtWPQCuHme67tEYUIx3Kh0PHR9N6bs61A.ttf", "IBMPlexArabic", "normal");
-  doc.setFont("IBMPlexArabic");
+  // تسجيل الخط العربي
+  setupArabicFont(doc);
   
   doc.setFontSize(18);
   doc.text("تقرير الموردين", doc.internal.pageSize.getWidth() / 2, 15, { align: "center" });
@@ -199,14 +207,14 @@ export function exportSuppliersToPDF(suppliers: Supplier[], filename = "المو
     body: tableData,
     startY: 35,
     styles: {
-      font: "helvetica",
+      font: "Amiri",
       halign: "right",
       fontSize: 10,
     },
     headStyles: {
       fillColor: [59, 130, 246],
       textColor: 255,
-      fontStyle: "bold",
+      font: "Amiri",
     },
     alternateRowStyles: {
       fillColor: [245, 247, 250],
@@ -240,6 +248,9 @@ export function exportTransactionsToPDF(
     format: "a4",
   });
 
+  // تسجيل الخط العربي
+  setupArabicFont(doc);
+
   doc.setFontSize(18);
   doc.text("تقرير المعاملات", doc.internal.pageSize.getWidth() / 2, 15, { align: "center" });
   
@@ -261,14 +272,14 @@ export function exportTransactionsToPDF(
     body: tableData,
     startY: 35,
     styles: {
-      font: "helvetica",
+      font: "Amiri",
       halign: "right",
       fontSize: 10,
     },
     headStyles: {
       fillColor: [59, 130, 246],
       textColor: 255,
-      fontStyle: "bold",
+      font: "Amiri",
     },
     alternateRowStyles: {
       fillColor: [245, 247, 250],
@@ -305,6 +316,9 @@ export function exportSupplierReportToPDF(
     format: "a4",
   });
 
+  // تسجيل الخط العربي
+  setupArabicFont(doc);
+
   doc.setFontSize(18);
   doc.text(`كشف حساب: ${supplier.name}`, doc.internal.pageSize.getWidth() / 2, 15, { align: "center" });
   
@@ -334,14 +348,14 @@ export function exportSupplierReportToPDF(
       body: tableData,
       startY: yPos,
       styles: {
-        font: "helvetica",
+        font: "Amiri",
         halign: "right",
         fontSize: 10,
       },
       headStyles: {
         fillColor: [59, 130, 246],
         textColor: 255,
-        fontStyle: "bold",
+        font: "Amiri",
       },
       alternateRowStyles: {
         fillColor: [245, 247, 250],
