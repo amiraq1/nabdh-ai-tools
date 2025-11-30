@@ -36,13 +36,64 @@ const customFonts = {
 pdfMakeInstance.vfs = customVfs;
 pdfMakeInstance.fonts = customFonts;
 
-// دالة لمعالجة النص العربي RTL باستخدام Unicode markers
+// دالة للتحقق من وجود أحرف عربية
+function containsArabic(text: string): boolean {
+  return /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(text);
+}
+
+// دالة لعكس ترتيب الكلمات للنص العربي RTL
+// pdfmake لا يدعم RTL بشكل أصلي، لذا نحتاج لعكس الكلمات يدوياً
 function rtl(text: string): string {
   if (!text || text === "-") return text;
-  // استخدام Unicode RTL embedding characters
-  // RLE (Right-to-Left Embedding) = \u202B
-  // PDF (Pop Directional Formatting) = \u202C
-  return `\u202B${text}\u202C`;
+  
+  // إذا لم يحتوي على نص عربي، أرجعه كما هو
+  if (!containsArabic(text)) return text;
+  
+  // معالجة خاصة للنصوص التي تحتوي على نقطتين (:)
+  // مثل "كشف حساب: كرار" يجب أن تعكس كـ "كرار :كشف حساب"
+  // ثم تصبح في PDF "كشف حساب: كرار" بالترتيب الصحيح
+  
+  // فصل النص إلى كلمات مع الحفاظ على المسافات
+  const words = text.split(/(\s+)/);
+  
+  // عكس ترتيب الكلمات (مع الحفاظ على المسافات في مكانها)
+  const nonSpaceWords: string[] = [];
+  const spacePositions: { index: number; space: string }[] = [];
+  
+  words.forEach((word, index) => {
+    if (/^\s+$/.test(word)) {
+      spacePositions.push({ index: nonSpaceWords.length, space: word });
+    } else if (word) {
+      nonSpaceWords.push(word);
+    }
+  });
+  
+  // عكس الكلمات
+  nonSpaceWords.reverse();
+  
+  // إعادة بناء النص
+  let result = '';
+  let wordIndex = 0;
+  
+  for (let i = 0; i <= nonSpaceWords.length; i++) {
+    // إضافة المسافات في موقعها الأصلي (لكن من النهاية)
+    const spaces = spacePositions.filter(sp => sp.index === nonSpaceWords.length - i);
+    spaces.forEach(sp => {
+      if (i > 0) result += sp.space;
+    });
+    
+    if (i < nonSpaceWords.length) {
+      result += nonSpaceWords[i];
+      if (i < nonSpaceWords.length - 1 && !spacePositions.some(sp => sp.index === nonSpaceWords.length - i - 1)) {
+        result += ' ';
+      }
+    }
+  }
+  
+  // طريقة أبسط: عكس الكلمات مع مسافة واحدة بينها
+  const simpleReverse = text.trim().split(/\s+/).reverse().join(' ');
+  
+  return simpleReverse;
 }
 
 // دالة مساعدة لإنشاء PDF مع الخطوط العربية
