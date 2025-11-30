@@ -1,14 +1,8 @@
 import jsPDF from "jspdf";
-import "jspdf-autotable";
+import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 import type { Supplier, Transaction } from "@shared/schema";
 import AmiriFont from "./fonts/amiri-font";
-
-declare module "jspdf" {
-  interface jsPDF {
-    autoTable: (options: any) => jsPDF;
-  }
-}
 
 // تسجيل خط Amiri العربي في jsPDF
 function setupArabicFont(doc: jsPDF): void {
@@ -202,7 +196,7 @@ export function exportSuppliersToPDF(suppliers: Supplier[], filename = "المو
     s.name,
   ]);
 
-  doc.autoTable({
+  autoTable(doc, {
     head: [["ملاحظات", "الرصيد", "الفئة", "الهاتف", "الاسم"]],
     body: tableData,
     startY: 35,
@@ -229,7 +223,7 @@ export function exportSuppliersToPDF(suppliers: Supplier[], filename = "المو
   });
 
   const totalBalance = suppliers.reduce((sum, s) => sum + (s.balance || 0), 0);
-  const finalY = (doc as any).lastAutoTable.finalY || 35;
+  const finalY = (doc as any).lastAutoTable?.finalY || 35;
   doc.setFontSize(12);
   doc.text(`إجمالي الأرصدة: ${formatCurrency(totalBalance)}`, doc.internal.pageSize.getWidth() - 15, finalY + 15, { align: "right" });
   doc.text(`عدد الموردين: ${suppliers.length}`, doc.internal.pageSize.getWidth() - 15, finalY + 25, { align: "right" });
@@ -267,7 +261,7 @@ export function exportTransactionsToPDF(
     formatDate(t.date),
   ]);
 
-  doc.autoTable({
+  autoTable(doc, {
     head: [["الوصف", "المبلغ", "النوع", "المورد", "التاريخ"]],
     body: tableData,
     startY: 35,
@@ -295,7 +289,7 @@ export function exportTransactionsToPDF(
 
   const totalDebits = transactions.filter(t => t.type === "debit").reduce((sum, t) => sum + t.amount, 0);
   const totalCredits = transactions.filter(t => t.type === "credit").reduce((sum, t) => sum + t.amount, 0);
-  const finalY = (doc as any).lastAutoTable.finalY || 35;
+  const finalY = (doc as any).lastAutoTable?.finalY || 35;
   
   doc.setFontSize(12);
   doc.text(`إجمالي المشتريات: ${formatCurrency(totalDebits)}`, doc.internal.pageSize.getWidth() - 15, finalY + 15, { align: "right" });
@@ -343,7 +337,7 @@ export function exportSupplierReportToPDF(
       formatDate(t.date),
     ]);
 
-    doc.autoTable({
+    autoTable(doc, {
       head: [["الوصف", "المبلغ", "النوع", "التاريخ"]],
       body: tableData,
       startY: yPos,
@@ -364,7 +358,7 @@ export function exportSupplierReportToPDF(
 
     const totalDebits = transactions.filter(t => t.type === "debit").reduce((sum, t) => sum + t.amount, 0);
     const totalCredits = transactions.filter(t => t.type === "credit").reduce((sum, t) => sum + t.amount, 0);
-    const finalY = (doc as any).lastAutoTable.finalY || yPos;
+    const finalY = (doc as any).lastAutoTable?.finalY || yPos;
     
     doc.setFontSize(11);
     doc.text(`إجمالي المشتريات: ${formatCurrency(totalDebits)}`, doc.internal.pageSize.getWidth() - 15, finalY + 12, { align: "right" });
