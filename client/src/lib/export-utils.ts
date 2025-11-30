@@ -6,6 +6,7 @@ import type { TDocumentDefinitions, Content, TableCell } from "pdfmake/interface
 import AmiriFont from "./fonts/amiri-font";
 
 // تسجيل الخطوط مع خط Amiri العربي
+const pdfMakeInstance = (pdfMake as any).default ?? pdfMake;
 const baseVfs = (pdfFonts as any).pdfMake?.vfs || (pdfFonts as any).vfs || {};
 const customVfs = {
   ...baseVfs,
@@ -31,9 +32,22 @@ const customFonts = {
   }
 };
 
+// تسجيل VFS والخطوط
+pdfMakeInstance.vfs = customVfs;
+pdfMakeInstance.fonts = customFonts;
+
+// دالة لمعالجة النص العربي RTL باستخدام Unicode markers
+function rtl(text: string): string {
+  if (!text || text === "-") return text;
+  // استخدام Unicode RTL embedding characters
+  // RLE (Right-to-Left Embedding) = \u202B
+  // PDF (Pop Directional Formatting) = \u202C
+  return `\u202B${text}\u202C`;
+}
+
 // دالة مساعدة لإنشاء PDF مع الخطوط العربية
 function createArabicPdf(docDefinition: TDocumentDefinitions) {
-  return pdfMake.createPdf(docDefinition, undefined, customFonts, customVfs);
+  return pdfMakeInstance.createPdf(docDefinition, undefined, customFonts, customVfs);
 }
 
 const formatCurrency = (amount: number) => {
@@ -200,7 +214,7 @@ export function exportTransactionsToExcel(
 // دالة مساعدة لإنشاء خلية جدول RTL
 function rtlCell(text: string, options: Record<string, any> = {}): TableCell {
   return {
-    text,
+    text: rtl(text),
     alignment: "right",
     ...options
   } as TableCell;
@@ -246,13 +260,13 @@ export function exportSuppliersToPDF(suppliers: Supplier[], filename = "المو
     pageSize: "A4",
     content: [
       {
-        text: "تقرير الموردين",
+        text: rtl("تقرير الموردين"),
         style: "header",
         alignment: "center",
         margin: [0, 0, 0, 10]
       },
       {
-        text: `تاريخ التقرير: ${new Date().toLocaleDateString("ar-SA")}`,
+        text: rtl(`تاريخ التقرير: ${new Date().toLocaleDateString("ar-SA")}`),
         alignment: "right",
         margin: [0, 0, 0, 15],
         fontSize: 10
@@ -271,14 +285,14 @@ export function exportSuppliersToPDF(suppliers: Supplier[], filename = "المو
         }
       },
       {
-        text: `إجمالي الأرصدة: ${formatCurrency(totalBalance)}`,
+        text: rtl(`إجمالي الأرصدة: ${formatCurrency(totalBalance)}`),
         alignment: "right",
         margin: [0, 15, 0, 5],
         fontSize: 12,
         bold: true
       },
       {
-        text: `عدد الموردين: ${suppliers.length}`,
+        text: rtl(`عدد الموردين: ${suppliers.length}`),
         alignment: "right",
         fontSize: 12
       }
@@ -327,13 +341,13 @@ export function exportTransactionsToPDF(
     pageSize: "A4",
     content: [
       {
-        text: "تقرير المعاملات",
+        text: rtl("تقرير المعاملات"),
         style: "header",
         alignment: "center",
         margin: [0, 0, 0, 10]
       },
       {
-        text: `تاريخ التقرير: ${new Date().toLocaleDateString("ar-SA")}`,
+        text: rtl(`تاريخ التقرير: ${new Date().toLocaleDateString("ar-SA")}`),
         alignment: "right",
         margin: [0, 0, 0, 15],
         fontSize: 10
@@ -352,21 +366,21 @@ export function exportTransactionsToPDF(
         }
       },
       {
-        text: `إجمالي المشتريات: ${formatCurrency(totalDebits)}`,
+        text: rtl(`إجمالي المشتريات: ${formatCurrency(totalDebits)}`),
         alignment: "right",
         margin: [0, 15, 0, 5],
         fontSize: 12,
         bold: true
       },
       {
-        text: `إجمالي الدفعات: ${formatCurrency(totalCredits)}`,
+        text: rtl(`إجمالي الدفعات: ${formatCurrency(totalCredits)}`),
         alignment: "right",
         margin: [0, 0, 0, 5],
         fontSize: 12,
         bold: true
       },
       {
-        text: `عدد المعاملات: ${transactions.length}`,
+        text: rtl(`عدد المعاملات: ${transactions.length}`),
         alignment: "right",
         fontSize: 12
       }
@@ -393,13 +407,13 @@ export function exportSupplierReportToPDF(
 ) {
   const content: Content[] = [
     {
-      text: `كشف حساب: ${supplier.name}`,
+      text: rtl(`كشف حساب: ${supplier.name}`),
       style: "header",
       alignment: "center",
       margin: [0, 0, 0, 10]
     },
     {
-      text: `تاريخ التقرير: ${new Date().toLocaleDateString("ar-SA")}`,
+      text: rtl(`تاريخ التقرير: ${new Date().toLocaleDateString("ar-SA")}`),
       alignment: "right",
       margin: [0, 0, 0, 15],
       fontSize: 10
@@ -456,14 +470,14 @@ export function exportSupplierReportToPDF(
 
     content.push(
       {
-        text: `إجمالي المشتريات: ${formatCurrency(totalDebits)}`,
+        text: rtl(`إجمالي المشتريات: ${formatCurrency(totalDebits)}`),
         alignment: "right",
         margin: [0, 15, 0, 5],
         fontSize: 11,
         bold: true
       },
       {
-        text: `إجمالي الدفعات: ${formatCurrency(totalCredits)}`,
+        text: rtl(`إجمالي الدفعات: ${formatCurrency(totalCredits)}`),
         alignment: "right",
         fontSize: 11,
         bold: true
@@ -471,7 +485,7 @@ export function exportSupplierReportToPDF(
     );
   } else {
     content.push({
-      text: "لا توجد معاملات لهذا المورد",
+      text: rtl("لا توجد معاملات لهذا المورد"),
       alignment: "center",
       margin: [0, 30, 0, 0],
       fontSize: 12,
