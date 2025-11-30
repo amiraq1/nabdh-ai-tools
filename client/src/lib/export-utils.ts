@@ -4,11 +4,20 @@ import * as XLSX from "xlsx";
 import type { Supplier, Transaction } from "@shared/schema";
 import AmiriFont from "./fonts/amiri-font";
 
-// تسجيل خط Amiri العربي في jsPDF
+// تمديد نوع jsPDF لدعم خاصية lang للنص العربي
+declare module "jspdf" {
+  interface TextOptionsLight {
+    lang?: string;
+  }
+}
+
+// تسجيل خط Amiri العربي في jsPDF وتفعيل RTL
 function setupArabicFont(doc: jsPDF): void {
   doc.addFileToVFS("Amiri-Regular.ttf", AmiriFont);
   doc.addFont("Amiri-Regular.ttf", "Amiri", "normal");
   doc.setFont("Amiri");
+  // تفعيل الكتابة من اليمين لليسار
+  doc.setR2L(true);
 }
 
 const formatCurrency = (amount: number) => {
@@ -183,10 +192,10 @@ export function exportSuppliersToPDF(suppliers: Supplier[], filename = "المو
   setupArabicFont(doc);
   
   doc.setFontSize(18);
-  doc.text("تقرير الموردين", doc.internal.pageSize.getWidth() / 2, 15, { align: "center" });
+  doc.text("تقرير الموردين", doc.internal.pageSize.getWidth() / 2, 15, { align: "center", lang: "ar" });
   
   doc.setFontSize(10);
-  doc.text(`تاريخ التقرير: ${new Date().toLocaleDateString("ar-SA")}`, doc.internal.pageSize.getWidth() - 15, 25, { align: "right" });
+  doc.text(`تاريخ التقرير: ${new Date().toLocaleDateString("ar-SA")}`, doc.internal.pageSize.getWidth() - 15, 25, { align: "right", lang: "ar" });
 
   const tableData = suppliers.map((s) => [
     s.notes || "-",
@@ -225,8 +234,8 @@ export function exportSuppliersToPDF(suppliers: Supplier[], filename = "المو
   const totalBalance = suppliers.reduce((sum, s) => sum + (s.balance || 0), 0);
   const finalY = (doc as any).lastAutoTable?.finalY || 35;
   doc.setFontSize(12);
-  doc.text(`إجمالي الأرصدة: ${formatCurrency(totalBalance)}`, doc.internal.pageSize.getWidth() - 15, finalY + 15, { align: "right" });
-  doc.text(`عدد الموردين: ${suppliers.length}`, doc.internal.pageSize.getWidth() - 15, finalY + 25, { align: "right" });
+  doc.text(`إجمالي الأرصدة: ${formatCurrency(totalBalance)}`, doc.internal.pageSize.getWidth() - 15, finalY + 15, { align: "right", lang: "ar" });
+  doc.text(`عدد الموردين: ${suppliers.length}`, doc.internal.pageSize.getWidth() - 15, finalY + 25, { align: "right", lang: "ar" });
 
   doc.save(`${filename}.pdf`);
 }
@@ -246,10 +255,10 @@ export function exportTransactionsToPDF(
   setupArabicFont(doc);
 
   doc.setFontSize(18);
-  doc.text("تقرير المعاملات", doc.internal.pageSize.getWidth() / 2, 15, { align: "center" });
+  doc.text("تقرير المعاملات", doc.internal.pageSize.getWidth() / 2, 15, { align: "center", lang: "ar" });
   
   doc.setFontSize(10);
-  doc.text(`تاريخ التقرير: ${new Date().toLocaleDateString("ar-SA")}`, doc.internal.pageSize.getWidth() - 15, 25, { align: "right" });
+  doc.text(`تاريخ التقرير: ${new Date().toLocaleDateString("ar-SA")}`, doc.internal.pageSize.getWidth() - 15, 25, { align: "right", lang: "ar" });
 
   const supplierMap = new Map(suppliers.map((s) => [s.id, s.name]));
 
@@ -292,9 +301,9 @@ export function exportTransactionsToPDF(
   const finalY = (doc as any).lastAutoTable?.finalY || 35;
   
   doc.setFontSize(12);
-  doc.text(`إجمالي المشتريات: ${formatCurrency(totalDebits)}`, doc.internal.pageSize.getWidth() - 15, finalY + 15, { align: "right" });
-  doc.text(`إجمالي الدفعات: ${formatCurrency(totalCredits)}`, doc.internal.pageSize.getWidth() - 15, finalY + 25, { align: "right" });
-  doc.text(`عدد المعاملات: ${transactions.length}`, doc.internal.pageSize.getWidth() - 15, finalY + 35, { align: "right" });
+  doc.text(`إجمالي المشتريات: ${formatCurrency(totalDebits)}`, doc.internal.pageSize.getWidth() - 15, finalY + 15, { align: "right", lang: "ar" });
+  doc.text(`إجمالي الدفعات: ${formatCurrency(totalCredits)}`, doc.internal.pageSize.getWidth() - 15, finalY + 25, { align: "right", lang: "ar" });
+  doc.text(`عدد المعاملات: ${transactions.length}`, doc.internal.pageSize.getWidth() - 15, finalY + 35, { align: "right", lang: "ar" });
 
   doc.save(`${filename}.pdf`);
 }
@@ -314,19 +323,19 @@ export function exportSupplierReportToPDF(
   setupArabicFont(doc);
 
   doc.setFontSize(18);
-  doc.text(`كشف حساب: ${supplier.name}`, doc.internal.pageSize.getWidth() / 2, 15, { align: "center" });
+  doc.text(`كشف حساب: ${supplier.name}`, doc.internal.pageSize.getWidth() / 2, 15, { align: "center", lang: "ar" });
   
   doc.setFontSize(10);
-  doc.text(`تاريخ التقرير: ${new Date().toLocaleDateString("ar-SA")}`, doc.internal.pageSize.getWidth() - 15, 25, { align: "right" });
+  doc.text(`تاريخ التقرير: ${new Date().toLocaleDateString("ar-SA")}`, doc.internal.pageSize.getWidth() - 15, 25, { align: "right", lang: "ar" });
 
   doc.setFontSize(12);
   let yPos = 40;
   
-  doc.text(`الهاتف: ${supplier.phone || "-"}`, doc.internal.pageSize.getWidth() - 15, yPos, { align: "right" });
+  doc.text(`الهاتف: ${supplier.phone || "-"}`, doc.internal.pageSize.getWidth() - 15, yPos, { align: "right", lang: "ar" });
   yPos += 8;
-  doc.text(`الفئة: ${supplier.category}`, doc.internal.pageSize.getWidth() - 15, yPos, { align: "right" });
+  doc.text(`الفئة: ${supplier.category}`, doc.internal.pageSize.getWidth() - 15, yPos, { align: "right", lang: "ar" });
   yPos += 8;
-  doc.text(`الرصيد الحالي: ${formatCurrency(supplier.balance)}`, doc.internal.pageSize.getWidth() - 15, yPos, { align: "right" });
+  doc.text(`الرصيد الحالي: ${formatCurrency(supplier.balance)}`, doc.internal.pageSize.getWidth() - 15, yPos, { align: "right", lang: "ar" });
   yPos += 15;
 
   if (transactions.length > 0) {
@@ -361,10 +370,10 @@ export function exportSupplierReportToPDF(
     const finalY = (doc as any).lastAutoTable?.finalY || yPos;
     
     doc.setFontSize(11);
-    doc.text(`إجمالي المشتريات: ${formatCurrency(totalDebits)}`, doc.internal.pageSize.getWidth() - 15, finalY + 12, { align: "right" });
-    doc.text(`إجمالي الدفعات: ${formatCurrency(totalCredits)}`, doc.internal.pageSize.getWidth() - 15, finalY + 20, { align: "right" });
+    doc.text(`إجمالي المشتريات: ${formatCurrency(totalDebits)}`, doc.internal.pageSize.getWidth() - 15, finalY + 12, { align: "right", lang: "ar" });
+    doc.text(`إجمالي الدفعات: ${formatCurrency(totalCredits)}`, doc.internal.pageSize.getWidth() - 15, finalY + 20, { align: "right", lang: "ar" });
   } else {
-    doc.text("لا توجد معاملات لهذا المورد", doc.internal.pageSize.getWidth() / 2, yPos + 10, { align: "center" });
+    doc.text("لا توجد معاملات لهذا المورد", doc.internal.pageSize.getWidth() / 2, yPos + 10, { align: "center", lang: "ar" });
   }
 
   doc.save(`${filename || `كشف_حساب_${supplier.name}`}.pdf`);
