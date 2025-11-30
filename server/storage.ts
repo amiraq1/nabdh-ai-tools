@@ -1,11 +1,11 @@
 import { type Supplier, type InsertSupplier, type Transaction, type InsertTransaction, type User, type UpsertUser, suppliers, transactions, users } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, sql, count } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
-  getUsers(): Promise<User[]>;
+  getUsers(page?: number, limit?: number): Promise<{ users: User[]; total: number; page: number; limit: number; totalPages: number }>;
   updateUserRole(id: string, role: string): Promise<User | undefined>;
   
   getSuppliers(): Promise<Supplier[]>;
@@ -46,8 +46,25 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  async getUsers(): Promise<User[]> {
-    return await db.select().from(users);
+  async getUsers(page: number = 1, limit: number = 20): Promise<{ users: User[]; total: number; page: number; limit: number; totalPages: number }> {
+    const offset = (page - 1) * limit;
+    
+    const [countResult] = await db.select({ total: count() }).from(users);
+    const total = countResult?.total || 0;
+    
+    const usersList = await db
+      .select()
+      .from(users)
+      .limit(limit)
+      .offset(offset);
+    
+    return {
+      users: usersList,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit)
+    };
   }
 
   async updateUserRole(id: string, role: string): Promise<User | undefined> {
@@ -108,40 +125,54 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createTransaction(insertTransaction: InsertTransaction): Promise<Transaction> {
-    const [transaction] = await db
-      .insert(transactions)
-      .values(insertTransaction)
-      .returning();
-    
-    const supplier = await this.getSupplier(insertTransaction.supplierId);
-    if (supplier) {
+    return await db.transaction(async (tx) => {
+      const [transaction] = await tx
+        .insert(transactions)
+        .values(insertTransaction)
+        .returning();
+      
       const balanceChange = insertTransaction.type === "debit" 
         ? -insertTransaction.amount 
         : insertTransaction.amount;
-      await this.updateSupplier(insertTransaction.supplierId, {
-        balance: (supplier.balance || 0) + balanceChange,
-      });
-    }
-    
-    return transaction;
+      
+      await tx
+        .update(suppliers)
+        .set({ 
+          balance: sql`COALESCE(${suppliers.balance}, 0) + ${balanceChange}` 
+        })
+        .where(eq(suppliers.id, insertTransaction.supplierId));
+      
+      return transaction;
+    });
   }
 
   async deleteTransaction(id: string): Promise<boolean> {
-    const transaction = await this.getTransaction(id);
-    if (!transaction) return false;
-    
-    const supplier = await this.getSupplier(transaction.supplierId);
-    if (supplier) {
+    return await db.transaction(async (tx) => {
+      const [transaction] = await tx
+        .select()
+        .from(transactions)
+        .where(eq(transactions.id, id));
+      
+      if (!transaction) return false;
+      
       const balanceChange = transaction.type === "debit" 
         ? transaction.amount 
         : -transaction.amount;
-      await this.updateSupplier(transaction.supplierId, {
-        balance: (supplier.balance || 0) + balanceChange,
-      });
-    }
-    
-    const result = await db.delete(transactions).where(eq(transactions.id, id)).returning();
-    return result.length > 0;
+      
+      await tx
+        .update(suppliers)
+        .set({ 
+          balance: sql`COALESCE(${suppliers.balance}, 0) + ${balanceChange}` 
+        })
+        .where(eq(suppliers.id, transaction.supplierId));
+      
+      const result = await tx
+        .delete(transactions)
+        .where(eq(transactions.id, id))
+        .returning();
+      
+      return result.length > 0;
+    });
   }
 
   async deleteTransactionsBySupplier(supplierId: string): Promise<void> {

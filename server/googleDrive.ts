@@ -80,17 +80,25 @@ export async function uploadBackupToGoogleDrive(data: {
   suppliers: any[];
   transactions: any[];
   users: any[];
-}) {
+}, createdBy?: { id: string; name: string; email?: string }) {
   const drive = await getUncachableGoogleDriveClient();
   const folderId = await getOrCreateBackupFolder();
   
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const backupFileName = `نسخة_احتياطية_${timestamp}.json`;
   
+  const creatorInfo = createdBy ? {
+    userId: createdBy.id,
+    userName: createdBy.name,
+    userEmail: createdBy.email,
+  } : {
+    managedBy: MANAGED_BY,
+  };
+  
   const backupContent = JSON.stringify({
     metadata: {
       createdAt: new Date().toISOString(),
-      managedBy: MANAGED_BY,
+      ...creatorInfo,
       version: '1.0',
       totalSuppliers: data.suppliers.length,
       totalTransactions: data.transactions.length,

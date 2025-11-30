@@ -33,21 +33,29 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/users", isAuthenticated, requireRole(["admin"]), async (_req, res) => {
+  app.get("/api/users", isAuthenticated, requireRole(["admin"]), async (req, res) => {
     try {
-      const users = await storage.getUsers();
-      res.json(users);
+      const page = Math.max(1, parseInt(req.query.page as string) || 1);
+      const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 20));
+      const result = await storage.getUsers(page, limit);
+      res.json(result);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch users" });
     }
   });
 
-  app.patch("/api/users/:id/role", isAuthenticated, requireRole(["admin"]), async (req, res) => {
+  app.patch("/api/users/:id/role", isAuthenticated, requireRole(["admin"]), async (req: any, res) => {
     try {
       const { role } = req.body;
       if (!["admin", "editor", "viewer"].includes(role)) {
         return res.status(400).json({ error: "Invalid role" });
       }
+      
+      const currentUserId = req.user?.claims?.sub;
+      if (currentUserId === req.params.id && role !== "admin") {
+        return res.status(403).json({ error: "لا يمكنك خفض رتبتك الخاصة" });
+      }
+      
       const user = await storage.updateUserRole(req.params.id, role);
       if (!user) {
         return res.status(404).json({ error: "User not found" });
@@ -200,17 +208,25 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/google-drive/backup", isAuthenticated, requireRole(["admin"]), async (_req, res) => {
+  app.post("/api/google-drive/backup", isAuthenticated, requireRole(["admin"]), async (req: any, res) => {
     try {
       const suppliers = await storage.getSuppliers();
       const transactions = await storage.getTransactions();
-      const users = await storage.getUsers();
+      const usersData = await storage.getUsers(1, 10000);
+      
+      const currentUserId = req.user?.claims?.sub;
+      const currentUser = currentUserId ? await storage.getUser(currentUserId) : null;
+      const createdBy = currentUser ? {
+        id: currentUser.id,
+        name: `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim() || currentUser.email || 'مستخدم',
+        email: currentUser.email || undefined,
+      } : undefined;
       
       const result = await uploadBackupToGoogleDrive({
         suppliers,
         transactions,
-        users,
-      });
+        users: usersData.users,
+      }, createdBy);
       
       res.json(result);
     } catch (error) {

@@ -22,11 +22,19 @@ import {
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Users, Shield, ShieldCheck, ShieldAlert, Eye } from "lucide-react";
+import { Users, Shield, ShieldCheck, ShieldAlert, Eye, ChevronRight, ChevronLeft } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLocation } from "wouter";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { isUnauthorizedError } from "@/lib/authUtils";
+
+interface UsersResponse {
+  users: User[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
 
 const roleLabels: Record<string, string> = {
   admin: "مدير",
@@ -50,6 +58,8 @@ export default function UsersManagement() {
   const { user: currentUser, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+  const [page, setPage] = useState(1);
+  const limit = 20;
 
   useEffect(() => {
     if (!authLoading && (!currentUser || currentUser.role !== "admin")) {
@@ -62,17 +72,28 @@ export default function UsersManagement() {
     }
   }, [currentUser, authLoading, toast, setLocation]);
 
-  const { data: users, isLoading } = useQuery<User[]>({
-    queryKey: ["/api/users"],
+  const { data: usersData, isLoading } = useQuery<UsersResponse>({
+    queryKey: ["/api/users", page, limit],
+    queryFn: async () => {
+      const response = await fetch(`/api/users?page=${page}&limit=${limit}`, {
+        credentials: "include",
+      });
+      if (!response.ok) {
+        throw new Error("Failed to fetch users");
+      }
+      return response.json();
+    },
     enabled: currentUser?.role === "admin",
   });
+
+  const users = usersData?.users;
 
   const updateRoleMutation = useMutation({
     mutationFn: async ({ userId, role }: { userId: string; role: string }) => {
       await apiRequest("PATCH", `/api/users/${userId}/role`, { role });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/users"], exact: false });
       toast({
         title: "تم التحديث",
         description: "تم تحديث صلاحية المستخدم بنجاح",
@@ -145,6 +166,7 @@ export default function UsersManagement() {
               ))}
             </div>
           ) : users && users.length > 0 ? (
+            <>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -240,6 +262,37 @@ export default function UsersManagement() {
                 })}
               </TableBody>
             </Table>
+            
+            {usersData && usersData.totalPages > 1 && (
+              <div className="flex items-center justify-between mt-4 pt-4 border-t">
+                <div className="text-sm text-muted-foreground">
+                  صفحة {usersData.page} من {usersData.totalPages} ({usersData.total} مستخدم)
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                    disabled={page === 1}
+                    data-testid="button-prev-page"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                    السابق
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage(p => Math.min(usersData.totalPages, p + 1))}
+                    disabled={page === usersData.totalPages}
+                    data-testid="button-next-page"
+                  >
+                    التالي
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
+          </>
           ) : (
             <div className="text-center py-8 text-muted-foreground">
               <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
