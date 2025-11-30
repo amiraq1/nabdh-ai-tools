@@ -4,11 +4,21 @@ import * as XLSX from "xlsx";
 import type { Supplier, Transaction } from "@shared/schema";
 import AmiriFont from "./fonts/amiri-font";
 
-// تمديد نوع jsPDF لدعم خاصية lang للنص العربي
+// تمديد نوع jsPDF لدعم الدوال والخصائص الإضافية للنص العربي
 declare module "jspdf" {
   interface TextOptionsLight {
     lang?: string;
   }
+}
+
+// دالة لمعالجة النص العربي وتصحيح اتجاهه
+function processArabicText(doc: jsPDF, text: string): string {
+  // استخدام دالة processArabic إذا كانت متاحة
+  if (typeof (doc as any).processArabic === 'function') {
+    return (doc as any).processArabic(text, true);
+  }
+  // خلاف ذلك، نعكس النص يدوياً
+  return text.split('').reverse().join('');
 }
 
 // تسجيل خط Amiri العربي في jsPDF وتفعيل RTL
@@ -192,21 +202,27 @@ export function exportSuppliersToPDF(suppliers: Supplier[], filename = "المو
   setupArabicFont(doc);
   
   doc.setFontSize(18);
-  doc.text("تقرير الموردين", doc.internal.pageSize.getWidth() / 2, 15, { align: "center", lang: "ar" });
+  doc.text(processArabicText(doc, "تقرير الموردين"), doc.internal.pageSize.getWidth() / 2, 15, { align: "center" });
   
   doc.setFontSize(10);
-  doc.text(`تاريخ التقرير: ${new Date().toLocaleDateString("ar-SA")}`, doc.internal.pageSize.getWidth() - 15, 25, { align: "right", lang: "ar" });
+  doc.text(processArabicText(doc, `تاريخ التقرير: ${new Date().toLocaleDateString("ar-SA")}`), doc.internal.pageSize.getWidth() - 15, 25, { align: "right" });
 
   const tableData = suppliers.map((s) => [
-    s.notes || "-",
-    formatCurrency(s.balance),
-    s.category,
-    s.phone || "-",
-    s.name,
+    processArabicText(doc, s.notes || "-"),
+    processArabicText(doc, formatCurrency(s.balance)),
+    processArabicText(doc, s.category),
+    processArabicText(doc, s.phone || "-"),
+    processArabicText(doc, s.name),
   ]);
 
   autoTable(doc, {
-    head: [["ملاحظات", "الرصيد", "الفئة", "الهاتف", "الاسم"]],
+    head: [[
+      processArabicText(doc, "ملاحظات"),
+      processArabicText(doc, "الرصيد"),
+      processArabicText(doc, "الفئة"),
+      processArabicText(doc, "الهاتف"),
+      processArabicText(doc, "الاسم")
+    ]],
     body: tableData,
     startY: 35,
     styles: {
@@ -234,8 +250,8 @@ export function exportSuppliersToPDF(suppliers: Supplier[], filename = "المو
   const totalBalance = suppliers.reduce((sum, s) => sum + (s.balance || 0), 0);
   const finalY = (doc as any).lastAutoTable?.finalY || 35;
   doc.setFontSize(12);
-  doc.text(`إجمالي الأرصدة: ${formatCurrency(totalBalance)}`, doc.internal.pageSize.getWidth() - 15, finalY + 15, { align: "right", lang: "ar" });
-  doc.text(`عدد الموردين: ${suppliers.length}`, doc.internal.pageSize.getWidth() - 15, finalY + 25, { align: "right", lang: "ar" });
+  doc.text(processArabicText(doc, `إجمالي الأرصدة: ${formatCurrency(totalBalance)}`), doc.internal.pageSize.getWidth() - 15, finalY + 15, { align: "right" });
+  doc.text(processArabicText(doc, `عدد الموردين: ${suppliers.length}`), doc.internal.pageSize.getWidth() - 15, finalY + 25, { align: "right" });
 
   doc.save(`${filename}.pdf`);
 }
@@ -255,23 +271,29 @@ export function exportTransactionsToPDF(
   setupArabicFont(doc);
 
   doc.setFontSize(18);
-  doc.text("تقرير المعاملات", doc.internal.pageSize.getWidth() / 2, 15, { align: "center", lang: "ar" });
+  doc.text(processArabicText(doc, "تقرير المعاملات"), doc.internal.pageSize.getWidth() / 2, 15, { align: "center" });
   
   doc.setFontSize(10);
-  doc.text(`تاريخ التقرير: ${new Date().toLocaleDateString("ar-SA")}`, doc.internal.pageSize.getWidth() - 15, 25, { align: "right", lang: "ar" });
+  doc.text(processArabicText(doc, `تاريخ التقرير: ${new Date().toLocaleDateString("ar-SA")}`), doc.internal.pageSize.getWidth() - 15, 25, { align: "right" });
 
   const supplierMap = new Map(suppliers.map((s) => [s.id, s.name]));
 
   const tableData = transactions.map((t) => [
-    t.description || "-",
-    formatCurrency(t.amount),
-    t.type === "debit" ? "مشتريات (له)" : "دفعة (منه)",
-    supplierMap.get(t.supplierId) || "-",
-    formatDate(t.date),
+    processArabicText(doc, t.description || "-"),
+    processArabicText(doc, formatCurrency(t.amount)),
+    processArabicText(doc, t.type === "debit" ? "مشتريات (له)" : "دفعة (منه)"),
+    processArabicText(doc, supplierMap.get(t.supplierId) || "-"),
+    processArabicText(doc, formatDate(t.date)),
   ]);
 
   autoTable(doc, {
-    head: [["الوصف", "المبلغ", "النوع", "المورد", "التاريخ"]],
+    head: [[
+      processArabicText(doc, "الوصف"),
+      processArabicText(doc, "المبلغ"),
+      processArabicText(doc, "النوع"),
+      processArabicText(doc, "المورد"),
+      processArabicText(doc, "التاريخ")
+    ]],
     body: tableData,
     startY: 35,
     styles: {
@@ -301,9 +323,9 @@ export function exportTransactionsToPDF(
   const finalY = (doc as any).lastAutoTable?.finalY || 35;
   
   doc.setFontSize(12);
-  doc.text(`إجمالي المشتريات: ${formatCurrency(totalDebits)}`, doc.internal.pageSize.getWidth() - 15, finalY + 15, { align: "right", lang: "ar" });
-  doc.text(`إجمالي الدفعات: ${formatCurrency(totalCredits)}`, doc.internal.pageSize.getWidth() - 15, finalY + 25, { align: "right", lang: "ar" });
-  doc.text(`عدد المعاملات: ${transactions.length}`, doc.internal.pageSize.getWidth() - 15, finalY + 35, { align: "right", lang: "ar" });
+  doc.text(processArabicText(doc, `إجمالي المشتريات: ${formatCurrency(totalDebits)}`), doc.internal.pageSize.getWidth() - 15, finalY + 15, { align: "right" });
+  doc.text(processArabicText(doc, `إجمالي الدفعات: ${formatCurrency(totalCredits)}`), doc.internal.pageSize.getWidth() - 15, finalY + 25, { align: "right" });
+  doc.text(processArabicText(doc, `عدد المعاملات: ${transactions.length}`), doc.internal.pageSize.getWidth() - 15, finalY + 35, { align: "right" });
 
   doc.save(`${filename}.pdf`);
 }
@@ -323,31 +345,36 @@ export function exportSupplierReportToPDF(
   setupArabicFont(doc);
 
   doc.setFontSize(18);
-  doc.text(`كشف حساب: ${supplier.name}`, doc.internal.pageSize.getWidth() / 2, 15, { align: "center", lang: "ar" });
+  doc.text(processArabicText(doc, `كشف حساب: ${supplier.name}`), doc.internal.pageSize.getWidth() / 2, 15, { align: "center" });
   
   doc.setFontSize(10);
-  doc.text(`تاريخ التقرير: ${new Date().toLocaleDateString("ar-SA")}`, doc.internal.pageSize.getWidth() - 15, 25, { align: "right", lang: "ar" });
+  doc.text(processArabicText(doc, `تاريخ التقرير: ${new Date().toLocaleDateString("ar-SA")}`), doc.internal.pageSize.getWidth() - 15, 25, { align: "right" });
 
   doc.setFontSize(12);
   let yPos = 40;
   
-  doc.text(`الهاتف: ${supplier.phone || "-"}`, doc.internal.pageSize.getWidth() - 15, yPos, { align: "right", lang: "ar" });
+  doc.text(processArabicText(doc, `الهاتف: ${supplier.phone || "-"}`), doc.internal.pageSize.getWidth() - 15, yPos, { align: "right" });
   yPos += 8;
-  doc.text(`الفئة: ${supplier.category}`, doc.internal.pageSize.getWidth() - 15, yPos, { align: "right", lang: "ar" });
+  doc.text(processArabicText(doc, `الفئة: ${supplier.category}`), doc.internal.pageSize.getWidth() - 15, yPos, { align: "right" });
   yPos += 8;
-  doc.text(`الرصيد الحالي: ${formatCurrency(supplier.balance)}`, doc.internal.pageSize.getWidth() - 15, yPos, { align: "right", lang: "ar" });
+  doc.text(processArabicText(doc, `الرصيد الحالي: ${formatCurrency(supplier.balance)}`), doc.internal.pageSize.getWidth() - 15, yPos, { align: "right" });
   yPos += 15;
 
   if (transactions.length > 0) {
     const tableData = transactions.map((t) => [
-      t.description || "-",
-      formatCurrency(t.amount),
-      t.type === "debit" ? "له" : "منه",
-      formatDate(t.date),
+      processArabicText(doc, t.description || "-"),
+      processArabicText(doc, formatCurrency(t.amount)),
+      processArabicText(doc, t.type === "debit" ? "له" : "منه"),
+      processArabicText(doc, formatDate(t.date)),
     ]);
 
     autoTable(doc, {
-      head: [["الوصف", "المبلغ", "النوع", "التاريخ"]],
+      head: [[
+        processArabicText(doc, "الوصف"),
+        processArabicText(doc, "المبلغ"),
+        processArabicText(doc, "النوع"),
+        processArabicText(doc, "التاريخ")
+      ]],
       body: tableData,
       startY: yPos,
       styles: {
@@ -370,10 +397,10 @@ export function exportSupplierReportToPDF(
     const finalY = (doc as any).lastAutoTable?.finalY || yPos;
     
     doc.setFontSize(11);
-    doc.text(`إجمالي المشتريات: ${formatCurrency(totalDebits)}`, doc.internal.pageSize.getWidth() - 15, finalY + 12, { align: "right", lang: "ar" });
-    doc.text(`إجمالي الدفعات: ${formatCurrency(totalCredits)}`, doc.internal.pageSize.getWidth() - 15, finalY + 20, { align: "right", lang: "ar" });
+    doc.text(processArabicText(doc, `إجمالي المشتريات: ${formatCurrency(totalDebits)}`), doc.internal.pageSize.getWidth() - 15, finalY + 12, { align: "right" });
+    doc.text(processArabicText(doc, `إجمالي الدفعات: ${formatCurrency(totalCredits)}`), doc.internal.pageSize.getWidth() - 15, finalY + 20, { align: "right" });
   } else {
-    doc.text("لا توجد معاملات لهذا المورد", doc.internal.pageSize.getWidth() / 2, yPos + 10, { align: "center", lang: "ar" });
+    doc.text(processArabicText(doc, "لا توجد معاملات لهذا المورد"), doc.internal.pageSize.getWidth() / 2, yPos + 10, { align: "center" });
   }
 
   doc.save(`${filename || `كشف_حساب_${supplier.name}`}.pdf`);
