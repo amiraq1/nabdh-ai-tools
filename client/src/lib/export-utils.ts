@@ -3,9 +3,38 @@ import * as pdfFonts from "pdfmake/build/vfs_fonts";
 import * as XLSX from "xlsx";
 import type { Supplier, Transaction } from "@shared/schema";
 import type { TDocumentDefinitions, Content, TableCell } from "pdfmake/interfaces";
+import AmiriFont from "./fonts/amiri-font";
 
-// تسجيل الخطوط
-(pdfMake as any).vfs = (pdfFonts as any).pdfMake?.vfs || (pdfFonts as any).vfs;
+// تسجيل الخطوط مع خط Amiri العربي
+const baseVfs = (pdfFonts as any).pdfMake?.vfs || (pdfFonts as any).vfs || {};
+const customVfs = {
+  ...baseVfs,
+  "Amiri-Regular.ttf": AmiriFont,
+  "Amiri-Bold.ttf": AmiriFont,
+  "Amiri-Italic.ttf": AmiriFont,
+  "Amiri-BoldItalic.ttf": AmiriFont
+};
+
+// تعريف الخطوط المتاحة
+const customFonts = {
+  Roboto: {
+    normal: "Roboto-Regular.ttf",
+    bold: "Roboto-Medium.ttf",
+    italics: "Roboto-Italic.ttf",
+    bolditalics: "Roboto-MediumItalic.ttf"
+  },
+  Amiri: {
+    normal: "Amiri-Regular.ttf",
+    bold: "Amiri-Bold.ttf",
+    italics: "Amiri-Italic.ttf",
+    bolditalics: "Amiri-BoldItalic.ttf"
+  }
+};
+
+// دالة مساعدة لإنشاء PDF مع الخطوط العربية
+function createArabicPdf(docDefinition: TDocumentDefinitions) {
+  return pdfMake.createPdf(docDefinition, undefined, customFonts, customVfs);
+}
 
 const formatCurrency = (amount: number) => {
   return new Intl.NumberFormat("ar-IQ", {
@@ -261,12 +290,12 @@ export function exportSuppliersToPDF(suppliers: Supplier[], filename = "المو
       }
     },
     defaultStyle: {
-      font: "Roboto",
+      font: "Amiri",
       fontSize: 10
     }
   };
 
-  pdfMake.createPdf(docDefinition).download(`${filename}.pdf`);
+  createArabicPdf(docDefinition).download(`${filename}.pdf`);
 }
 
 export function exportTransactionsToPDF(
@@ -349,12 +378,12 @@ export function exportTransactionsToPDF(
       }
     },
     defaultStyle: {
-      font: "Roboto",
+      font: "Amiri",
       fontSize: 10
     }
   };
 
-  pdfMake.createPdf(docDefinition).download(`${filename}.pdf`);
+  createArabicPdf(docDefinition).download(`${filename}.pdf`);
 }
 
 export function exportSupplierReportToPDF(
@@ -461,10 +490,10 @@ export function exportSupplierReportToPDF(
       }
     },
     defaultStyle: {
-      font: "Roboto",
+      font: "Amiri",
       fontSize: 10
     }
   };
 
-  pdfMake.createPdf(docDefinition).download(`${filename || `كشف_حساب_${supplier.name}`}.pdf`);
+  createArabicPdf(docDefinition).download(`${filename || `كشف_حساب_${supplier.name}`}.pdf`);
 }
