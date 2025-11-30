@@ -101,12 +101,13 @@ function createArabicPdf(docDefinition: TDocumentDefinitions) {
   return pdfMakeInstance.createPdf(docDefinition, undefined, customFonts, customVfs);
 }
 
+// تنسيق العملة باستخدام أرقام إنجليزية مع رمز العملة العربي
 const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat("ar-IQ", {
-    style: "currency",
-    currency: "IQD",
+  const formattedNumber = new Intl.NumberFormat("en-US", {
     minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
   }).format(amount);
+  return `${formattedNumber} د.ع`;
 };
 
 // تحويل الأرقام إلى كلمات عربية
@@ -194,14 +195,20 @@ export function numberToArabicWords(num: number): string {
 }
 
 export function formatCurrencyWithWords(amount: number): { numeric: string; words: string } {
+  const formattedNumber = new Intl.NumberFormat("en-US").format(amount);
   return {
-    numeric: new Intl.NumberFormat("ar-IQ").format(amount) + " د.ع",
+    numeric: `${formattedNumber} د.ع`,
     words: numberToArabicWords(amount)
   };
 }
 
+// تنسيق التاريخ باستخدام أرقام إنجليزية
 const formatDate = (dateStr: string) => {
-  return new Date(dateStr).toLocaleDateString("ar-SA");
+  const date = new Date(dateStr);
+  const day = date.getDate();
+  const month = date.getMonth() + 1;
+  const year = date.getFullYear();
+  return `${year}/${month}/${day}`;
 };
 
 export function exportSuppliersToExcel(suppliers: Supplier[], filename = "الموردين") {
@@ -317,7 +324,7 @@ export function exportSuppliersToPDF(suppliers: Supplier[], filename = "المو
         margin: [0, 0, 0, 10]
       },
       {
-        text: rtl(`تاريخ التقرير: ${new Date().toLocaleDateString("ar-SA")}`),
+        text: rtl(`تاريخ التقرير: ${formatDate(new Date().toISOString())}`),
         alignment: "right",
         margin: [0, 0, 0, 15],
         fontSize: 10
@@ -398,7 +405,7 @@ export function exportTransactionsToPDF(
         margin: [0, 0, 0, 10]
       },
       {
-        text: rtl(`تاريخ التقرير: ${new Date().toLocaleDateString("ar-SA")}`),
+        text: rtl(`تاريخ التقرير: ${formatDate(new Date().toISOString())}`),
         alignment: "right",
         margin: [0, 0, 0, 15],
         fontSize: 10
@@ -464,7 +471,7 @@ export function exportSupplierReportToPDF(
       margin: [0, 0, 0, 10]
     },
     {
-      text: rtl(`تاريخ التقرير: ${new Date().toLocaleDateString("ar-SA")}`),
+      text: rtl(`تاريخ التقرير: ${formatDate(new Date().toISOString())}`),
       alignment: "right",
       margin: [0, 0, 0, 15],
       fontSize: 10
