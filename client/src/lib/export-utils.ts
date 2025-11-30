@@ -1,34 +1,11 @@
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+import * as pdfMake from "pdfmake/build/pdfmake";
+import * as pdfFonts from "pdfmake/build/vfs_fonts";
 import * as XLSX from "xlsx";
 import type { Supplier, Transaction } from "@shared/schema";
-import AmiriFont from "./fonts/amiri-font";
+import type { TDocumentDefinitions, Content, TableCell } from "pdfmake/interfaces";
 
-// تمديد نوع jsPDF لدعم الدوال والخصائص الإضافية للنص العربي
-declare module "jspdf" {
-  interface TextOptionsLight {
-    lang?: string;
-  }
-}
-
-// دالة لمعالجة النص العربي وتصحيح اتجاهه
-function processArabicText(doc: jsPDF, text: string): string {
-  // استخدام دالة processArabic إذا كانت متاحة
-  if (typeof (doc as any).processArabic === 'function') {
-    return (doc as any).processArabic(text, true);
-  }
-  // خلاف ذلك، نعكس النص يدوياً
-  return text.split('').reverse().join('');
-}
-
-// تسجيل خط Amiri العربي في jsPDF وتفعيل RTL
-function setupArabicFont(doc: jsPDF): void {
-  doc.addFileToVFS("Amiri-Regular.ttf", AmiriFont);
-  doc.addFont("Amiri-Regular.ttf", "Amiri", "normal");
-  doc.setFont("Amiri");
-  // تفعيل الكتابة من اليمين لليسار
-  doc.setR2L(true);
-}
+// تسجيل الخطوط
+(pdfMake as any).vfs = (pdfFonts as any).pdfMake?.vfs || (pdfFonts as any).vfs;
 
 const formatCurrency = (amount: number) => {
   return new Intl.NumberFormat("ar-IQ", {
@@ -191,69 +168,105 @@ export function exportTransactionsToExcel(
   XLSX.writeFile(wb, `${filename}.xlsx`);
 }
 
+// دالة مساعدة لإنشاء خلية جدول RTL
+function rtlCell(text: string, options: Record<string, any> = {}): TableCell {
+  return {
+    text,
+    alignment: "right",
+    ...options
+  } as TableCell;
+}
+
+// دالة مساعدة لإنشاء صف رأس الجدول
+function headerRow(cells: string[]): TableCell[] {
+  return cells.map(text => rtlCell(text, { 
+    fillColor: "#3B82F6", 
+    color: "#FFFFFF",
+    bold: true,
+    margin: [5, 8, 5, 8]
+  }));
+}
+
+// دالة مساعدة لإنشاء صف بيانات
+function dataRow(cells: string[], isAlternate: boolean): TableCell[] {
+  return cells.map(text => rtlCell(text, { 
+    fillColor: isAlternate ? "#F5F7FA" : "#FFFFFF",
+    margin: [5, 6, 5, 6]
+  }));
+}
+
 export function exportSuppliersToPDF(suppliers: Supplier[], filename = "الموردين") {
-  const doc = new jsPDF({
-    orientation: "landscape",
-    unit: "mm",
-    format: "a4",
-  });
+  const tableBody: TableCell[][] = [
+    headerRow(["ملاحظات", "الرصيد", "الفئة", "الهاتف", "الاسم"])
+  ];
 
-  // تسجيل الخط العربي
-  setupArabicFont(doc);
-  
-  doc.setFontSize(18);
-  doc.text(processArabicText(doc, "تقرير الموردين"), doc.internal.pageSize.getWidth() / 2, 15, { align: "center" });
-  
-  doc.setFontSize(10);
-  doc.text(processArabicText(doc, `تاريخ التقرير: ${new Date().toLocaleDateString("ar-SA")}`), doc.internal.pageSize.getWidth() - 15, 25, { align: "right" });
-
-  const tableData = suppliers.map((s) => [
-    processArabicText(doc, s.notes || "-"),
-    processArabicText(doc, formatCurrency(s.balance)),
-    processArabicText(doc, s.category),
-    processArabicText(doc, s.phone || "-"),
-    processArabicText(doc, s.name),
-  ]);
-
-  autoTable(doc, {
-    head: [[
-      processArabicText(doc, "ملاحظات"),
-      processArabicText(doc, "الرصيد"),
-      processArabicText(doc, "الفئة"),
-      processArabicText(doc, "الهاتف"),
-      processArabicText(doc, "الاسم")
-    ]],
-    body: tableData,
-    startY: 35,
-    styles: {
-      font: "Amiri",
-      halign: "right",
-      fontSize: 10,
-    },
-    headStyles: {
-      fillColor: [59, 130, 246],
-      textColor: 255,
-      font: "Amiri",
-    },
-    alternateRowStyles: {
-      fillColor: [245, 247, 250],
-    },
-    columnStyles: {
-      0: { cellWidth: 40 },
-      1: { cellWidth: 30 },
-      2: { cellWidth: 30 },
-      3: { cellWidth: 35 },
-      4: { cellWidth: 50 },
-    },
+  suppliers.forEach((s, index) => {
+    tableBody.push(dataRow([
+      s.notes || "-",
+      formatCurrency(s.balance),
+      s.category,
+      s.phone || "-",
+      s.name
+    ], index % 2 === 1));
   });
 
   const totalBalance = suppliers.reduce((sum, s) => sum + (s.balance || 0), 0);
-  const finalY = (doc as any).lastAutoTable?.finalY || 35;
-  doc.setFontSize(12);
-  doc.text(processArabicText(doc, `إجمالي الأرصدة: ${formatCurrency(totalBalance)}`), doc.internal.pageSize.getWidth() - 15, finalY + 15, { align: "right" });
-  doc.text(processArabicText(doc, `عدد الموردين: ${suppliers.length}`), doc.internal.pageSize.getWidth() - 15, finalY + 25, { align: "right" });
 
-  doc.save(`${filename}.pdf`);
+  const docDefinition: TDocumentDefinitions = {
+    pageOrientation: "landscape",
+    pageSize: "A4",
+    content: [
+      {
+        text: "تقرير الموردين",
+        style: "header",
+        alignment: "center",
+        margin: [0, 0, 0, 10]
+      },
+      {
+        text: `تاريخ التقرير: ${new Date().toLocaleDateString("ar-SA")}`,
+        alignment: "right",
+        margin: [0, 0, 0, 15],
+        fontSize: 10
+      },
+      {
+        table: {
+          headerRows: 1,
+          widths: [80, 60, 50, 70, 100],
+          body: tableBody
+        },
+        layout: {
+          hLineWidth: () => 0.5,
+          vLineWidth: () => 0.5,
+          hLineColor: () => "#E5E7EB",
+          vLineColor: () => "#E5E7EB"
+        }
+      },
+      {
+        text: `إجمالي الأرصدة: ${formatCurrency(totalBalance)}`,
+        alignment: "right",
+        margin: [0, 15, 0, 5],
+        fontSize: 12,
+        bold: true
+      },
+      {
+        text: `عدد الموردين: ${suppliers.length}`,
+        alignment: "right",
+        fontSize: 12
+      }
+    ] as Content[],
+    styles: {
+      header: {
+        fontSize: 18,
+        bold: true
+      }
+    },
+    defaultStyle: {
+      font: "Roboto",
+      fontSize: 10
+    }
+  };
+
+  pdfMake.createPdf(docDefinition).download(`${filename}.pdf`);
 }
 
 export function exportTransactionsToPDF(
@@ -261,73 +274,87 @@ export function exportTransactionsToPDF(
   suppliers: Supplier[],
   filename = "المعاملات"
 ) {
-  const doc = new jsPDF({
-    orientation: "landscape",
-    unit: "mm",
-    format: "a4",
-  });
-
-  // تسجيل الخط العربي
-  setupArabicFont(doc);
-
-  doc.setFontSize(18);
-  doc.text(processArabicText(doc, "تقرير المعاملات"), doc.internal.pageSize.getWidth() / 2, 15, { align: "center" });
-  
-  doc.setFontSize(10);
-  doc.text(processArabicText(doc, `تاريخ التقرير: ${new Date().toLocaleDateString("ar-SA")}`), doc.internal.pageSize.getWidth() - 15, 25, { align: "right" });
-
   const supplierMap = new Map(suppliers.map((s) => [s.id, s.name]));
 
-  const tableData = transactions.map((t) => [
-    processArabicText(doc, t.description || "-"),
-    processArabicText(doc, formatCurrency(t.amount)),
-    processArabicText(doc, t.type === "debit" ? "مشتريات (له)" : "دفعة (منه)"),
-    processArabicText(doc, supplierMap.get(t.supplierId) || "-"),
-    processArabicText(doc, formatDate(t.date)),
-  ]);
+  const tableBody: TableCell[][] = [
+    headerRow(["الوصف", "المبلغ", "النوع", "المورد", "التاريخ"])
+  ];
 
-  autoTable(doc, {
-    head: [[
-      processArabicText(doc, "الوصف"),
-      processArabicText(doc, "المبلغ"),
-      processArabicText(doc, "النوع"),
-      processArabicText(doc, "المورد"),
-      processArabicText(doc, "التاريخ")
-    ]],
-    body: tableData,
-    startY: 35,
-    styles: {
-      font: "Amiri",
-      halign: "right",
-      fontSize: 10,
-    },
-    headStyles: {
-      fillColor: [59, 130, 246],
-      textColor: 255,
-      font: "Amiri",
-    },
-    alternateRowStyles: {
-      fillColor: [245, 247, 250],
-    },
-    columnStyles: {
-      0: { cellWidth: 50 },
-      1: { cellWidth: 30 },
-      2: { cellWidth: 30 },
-      3: { cellWidth: 40 },
-      4: { cellWidth: 30 },
-    },
+  transactions.forEach((t, index) => {
+    tableBody.push(dataRow([
+      t.description || "-",
+      formatCurrency(t.amount),
+      t.type === "debit" ? "مشتريات (له)" : "دفعة (منه)",
+      supplierMap.get(t.supplierId) || "-",
+      formatDate(t.date)
+    ], index % 2 === 1));
   });
 
   const totalDebits = transactions.filter(t => t.type === "debit").reduce((sum, t) => sum + t.amount, 0);
   const totalCredits = transactions.filter(t => t.type === "credit").reduce((sum, t) => sum + t.amount, 0);
-  const finalY = (doc as any).lastAutoTable?.finalY || 35;
-  
-  doc.setFontSize(12);
-  doc.text(processArabicText(doc, `إجمالي المشتريات: ${formatCurrency(totalDebits)}`), doc.internal.pageSize.getWidth() - 15, finalY + 15, { align: "right" });
-  doc.text(processArabicText(doc, `إجمالي الدفعات: ${formatCurrency(totalCredits)}`), doc.internal.pageSize.getWidth() - 15, finalY + 25, { align: "right" });
-  doc.text(processArabicText(doc, `عدد المعاملات: ${transactions.length}`), doc.internal.pageSize.getWidth() - 15, finalY + 35, { align: "right" });
 
-  doc.save(`${filename}.pdf`);
+  const docDefinition: TDocumentDefinitions = {
+    pageOrientation: "landscape",
+    pageSize: "A4",
+    content: [
+      {
+        text: "تقرير المعاملات",
+        style: "header",
+        alignment: "center",
+        margin: [0, 0, 0, 10]
+      },
+      {
+        text: `تاريخ التقرير: ${new Date().toLocaleDateString("ar-SA")}`,
+        alignment: "right",
+        margin: [0, 0, 0, 15],
+        fontSize: 10
+      },
+      {
+        table: {
+          headerRows: 1,
+          widths: [100, 60, 60, 80, 60],
+          body: tableBody
+        },
+        layout: {
+          hLineWidth: () => 0.5,
+          vLineWidth: () => 0.5,
+          hLineColor: () => "#E5E7EB",
+          vLineColor: () => "#E5E7EB"
+        }
+      },
+      {
+        text: `إجمالي المشتريات: ${formatCurrency(totalDebits)}`,
+        alignment: "right",
+        margin: [0, 15, 0, 5],
+        fontSize: 12,
+        bold: true
+      },
+      {
+        text: `إجمالي الدفعات: ${formatCurrency(totalCredits)}`,
+        alignment: "right",
+        margin: [0, 0, 0, 5],
+        fontSize: 12,
+        bold: true
+      },
+      {
+        text: `عدد المعاملات: ${transactions.length}`,
+        alignment: "right",
+        fontSize: 12
+      }
+    ] as Content[],
+    styles: {
+      header: {
+        fontSize: 18,
+        bold: true
+      }
+    },
+    defaultStyle: {
+      font: "Roboto",
+      fontSize: 10
+    }
+  };
+
+  pdfMake.createPdf(docDefinition).download(`${filename}.pdf`);
 }
 
 export function exportSupplierReportToPDF(
@@ -335,73 +362,109 @@ export function exportSupplierReportToPDF(
   transactions: Transaction[],
   filename?: string
 ) {
-  const doc = new jsPDF({
-    orientation: "portrait",
-    unit: "mm",
-    format: "a4",
-  });
-
-  // تسجيل الخط العربي
-  setupArabicFont(doc);
-
-  doc.setFontSize(18);
-  doc.text(processArabicText(doc, `كشف حساب: ${supplier.name}`), doc.internal.pageSize.getWidth() / 2, 15, { align: "center" });
-  
-  doc.setFontSize(10);
-  doc.text(processArabicText(doc, `تاريخ التقرير: ${new Date().toLocaleDateString("ar-SA")}`), doc.internal.pageSize.getWidth() - 15, 25, { align: "right" });
-
-  doc.setFontSize(12);
-  let yPos = 40;
-  
-  doc.text(processArabicText(doc, `الهاتف: ${supplier.phone || "-"}`), doc.internal.pageSize.getWidth() - 15, yPos, { align: "right" });
-  yPos += 8;
-  doc.text(processArabicText(doc, `الفئة: ${supplier.category}`), doc.internal.pageSize.getWidth() - 15, yPos, { align: "right" });
-  yPos += 8;
-  doc.text(processArabicText(doc, `الرصيد الحالي: ${formatCurrency(supplier.balance)}`), doc.internal.pageSize.getWidth() - 15, yPos, { align: "right" });
-  yPos += 15;
+  const content: Content[] = [
+    {
+      text: `كشف حساب: ${supplier.name}`,
+      style: "header",
+      alignment: "center",
+      margin: [0, 0, 0, 10]
+    },
+    {
+      text: `تاريخ التقرير: ${new Date().toLocaleDateString("ar-SA")}`,
+      alignment: "right",
+      margin: [0, 0, 0, 15],
+      fontSize: 10
+    },
+    {
+      columns: [
+        { width: "*", text: "" },
+        {
+          width: "auto",
+          table: {
+            body: [
+              [rtlCell(`الهاتف: ${supplier.phone || "-"}`, { border: [false, false, false, false] })],
+              [rtlCell(`الفئة: ${supplier.category}`, { border: [false, false, false, false] })],
+              [rtlCell(`الرصيد الحالي: ${formatCurrency(supplier.balance)}`, { border: [false, false, false, false], bold: true })]
+            ]
+          },
+          layout: "noBorders"
+        }
+      ],
+      margin: [0, 0, 0, 20]
+    }
+  ];
 
   if (transactions.length > 0) {
-    const tableData = transactions.map((t) => [
-      processArabicText(doc, t.description || "-"),
-      processArabicText(doc, formatCurrency(t.amount)),
-      processArabicText(doc, t.type === "debit" ? "له" : "منه"),
-      processArabicText(doc, formatDate(t.date)),
-    ]);
+    const tableBody: TableCell[][] = [
+      headerRow(["الوصف", "المبلغ", "النوع", "التاريخ"])
+    ];
 
-    autoTable(doc, {
-      head: [[
-        processArabicText(doc, "الوصف"),
-        processArabicText(doc, "المبلغ"),
-        processArabicText(doc, "النوع"),
-        processArabicText(doc, "التاريخ")
-      ]],
-      body: tableData,
-      startY: yPos,
-      styles: {
-        font: "Amiri",
-        halign: "right",
-        fontSize: 10,
+    transactions.forEach((t, index) => {
+      tableBody.push(dataRow([
+        t.description || "-",
+        formatCurrency(t.amount),
+        t.type === "debit" ? "له" : "منه",
+        formatDate(t.date)
+      ], index % 2 === 1));
+    });
+
+    content.push({
+      table: {
+        headerRows: 1,
+        widths: [150, 80, 50, 80],
+        body: tableBody
       },
-      headStyles: {
-        fillColor: [59, 130, 246],
-        textColor: 255,
-        font: "Amiri",
-      },
-      alternateRowStyles: {
-        fillColor: [245, 247, 250],
-      },
+      layout: {
+        hLineWidth: () => 0.5,
+        vLineWidth: () => 0.5,
+        hLineColor: () => "#E5E7EB",
+        vLineColor: () => "#E5E7EB"
+      }
     });
 
     const totalDebits = transactions.filter(t => t.type === "debit").reduce((sum, t) => sum + t.amount, 0);
     const totalCredits = transactions.filter(t => t.type === "credit").reduce((sum, t) => sum + t.amount, 0);
-    const finalY = (doc as any).lastAutoTable?.finalY || yPos;
-    
-    doc.setFontSize(11);
-    doc.text(processArabicText(doc, `إجمالي المشتريات: ${formatCurrency(totalDebits)}`), doc.internal.pageSize.getWidth() - 15, finalY + 12, { align: "right" });
-    doc.text(processArabicText(doc, `إجمالي الدفعات: ${formatCurrency(totalCredits)}`), doc.internal.pageSize.getWidth() - 15, finalY + 20, { align: "right" });
+
+    content.push(
+      {
+        text: `إجمالي المشتريات: ${formatCurrency(totalDebits)}`,
+        alignment: "right",
+        margin: [0, 15, 0, 5],
+        fontSize: 11,
+        bold: true
+      },
+      {
+        text: `إجمالي الدفعات: ${formatCurrency(totalCredits)}`,
+        alignment: "right",
+        fontSize: 11,
+        bold: true
+      }
+    );
   } else {
-    doc.text(processArabicText(doc, "لا توجد معاملات لهذا المورد"), doc.internal.pageSize.getWidth() / 2, yPos + 10, { align: "center" });
+    content.push({
+      text: "لا توجد معاملات لهذا المورد",
+      alignment: "center",
+      margin: [0, 30, 0, 0],
+      fontSize: 12,
+      italics: true
+    });
   }
 
-  doc.save(`${filename || `كشف_حساب_${supplier.name}`}.pdf`);
+  const docDefinition: TDocumentDefinitions = {
+    pageOrientation: "portrait",
+    pageSize: "A4",
+    content,
+    styles: {
+      header: {
+        fontSize: 18,
+        bold: true
+      }
+    },
+    defaultStyle: {
+      font: "Roboto",
+      fontSize: 10
+    }
+  };
+
+  pdfMake.createPdf(docDefinition).download(`${filename || `كشف_حساب_${supplier.name}`}.pdf`);
 }
