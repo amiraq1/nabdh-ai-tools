@@ -17,6 +17,7 @@ import TransactionsList from "@/pages/transactions-list";
 import UsersManagement from "@/pages/users-management";
 import GoogleDriveBackup from "@/pages/google-drive-backup";
 import Landing from "@/pages/landing";
+import Login from "@/pages/login";
 import NotFound from "@/pages/not-found";
 import { Loader2 } from "lucide-react";
 import { UserMenu } from "@/components/user-menu";
@@ -65,6 +66,15 @@ function AuthenticatedApp() {
   );
 }
 
+function UnauthenticatedRouter() {
+  return (
+    <Switch>
+      <Route path="/login" component={Login} />
+      <Route component={Landing} />
+    </Switch>
+  );
+}
+
 function AppContent() {
   const { isAuthenticated, isLoading } = useAuth();
 
@@ -77,7 +87,7 @@ function AppContent() {
   }
 
   if (!isAuthenticated) {
-    return <Landing />;
+    return <UnauthenticatedRouter />;
   }
 
   return <AuthenticatedApp />;

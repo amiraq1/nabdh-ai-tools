@@ -11,6 +11,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { LogOut, User, Shield } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useLocation } from "wouter";
 
 const roleLabels: Record<string, string> = {
   admin: "مدير",
@@ -20,6 +23,17 @@ const roleLabels: Record<string, string> = {
 
 export function UserMenu() {
   const { user } = useAuth();
+  const [, navigate] = useLocation();
+
+  const logoutMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("POST", "/api/auth/logout");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      navigate("/");
+    },
+  });
 
   if (!user) return null;
 
@@ -60,9 +74,10 @@ export function UserMenu() {
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem 
-          onClick={() => window.location.href = "/api/logout"}
+          onClick={() => logoutMutation.mutate()}
           className="text-destructive focus:text-destructive cursor-pointer"
           data-testid="button-logout"
+          disabled={logoutMutation.isPending}
         >
           <LogOut className="ml-2 h-4 w-4" />
           تسجيل الخروج

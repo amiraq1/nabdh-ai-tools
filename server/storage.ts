@@ -1,10 +1,12 @@
-import { type Supplier, type InsertSupplier, type Transaction, type InsertTransaction, type User, type UpsertUser, suppliers, transactions, users } from "@shared/schema";
+import { type Supplier, type InsertSupplier, type Transaction, type InsertTransaction, type User, type InsertUser, suppliers, transactions, users } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, sql, count } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
-  upsertUser(user: UpsertUser): Promise<User>;
+  getUserByEmail(email: string): Promise<User | undefined>;
+  createUser(user: InsertUser): Promise<User>;
+  getUsersCount(): Promise<number>;
   getUsers(page?: number, limit?: number): Promise<{ users: User[]; total: number; page: number; limit: number; totalPages: number }>;
   updateUserRole(id: string, role: string): Promise<User | undefined>;
   
@@ -28,22 +30,22 @@ export class DatabaseStorage implements IStorage {
     return user || undefined;
   }
 
-  async upsertUser(userData: UpsertUser): Promise<User> {
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.email, email));
+    return user || undefined;
+  }
+
+  async createUser(userData: InsertUser): Promise<User> {
     const [user] = await db
       .insert(users)
       .values({ ...userData, role: userData.role || "viewer" })
-      .onConflictDoUpdate({
-        target: users.id,
-        set: {
-          email: userData.email,
-          firstName: userData.firstName,
-          lastName: userData.lastName,
-          profileImageUrl: userData.profileImageUrl,
-          updatedAt: new Date(),
-        },
-      })
       .returning();
     return user;
+  }
+
+  async getUsersCount(): Promise<number> {
+    const [result] = await db.select({ count: count() }).from(users);
+    return result?.count || 0;
   }
 
   async getUsers(page: number = 1, limit: number = 20): Promise<{ users: User[]; total: number; page: number; limit: number; totalPages: number }> {

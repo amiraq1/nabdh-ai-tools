@@ -1,3 +1,4 @@
+import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -49,12 +50,11 @@ export default function Landing() {
           </div>
           <div className="flex items-center gap-3">
             <ThemeToggle />
-            <Button 
-              onClick={() => window.location.href = "/api/login"}
-              data-testid="button-login"
-            >
-              تسجيل الدخول
-            </Button>
+            <Link href="/login">
+              <Button data-testid="button-login">
+                تسجيل الدخول
+              </Button>
+            </Link>
           </div>
         </div>
       </header>
@@ -71,13 +71,11 @@ export default function Landing() {
               نظام متكامل لإدارة الموردين والمعاملات المالية، مع تقارير تفصيلية
               ورسوم بيانية تفاعلية ونظام إشعارات ذكي
             </p>
-            <Button 
-              size="lg" 
-              onClick={() => window.location.href = "/api/login"}
-              data-testid="button-get-started"
-            >
-              ابدأ الآن
-            </Button>
+            <Link href="/login">
+              <Button size="lg" data-testid="button-get-started">
+                ابدأ الآن
+              </Button>
+            </Link>
           </div>
         </section>
 
@@ -110,13 +108,11 @@ export default function Landing() {
                 <p className="text-muted-foreground mb-6">
                   سجّل دخولك الآن وابدأ بإدارة مورديك بشكل احترافي
                 </p>
-                <Button 
-                  size="lg"
-                  onClick={() => window.location.href = "/api/login"}
-                  data-testid="button-login-cta"
-                >
-                  تسجيل الدخول
-                </Button>
+                <Link href="/login">
+                  <Button size="lg" data-testid="button-login-cta">
+                    تسجيل الدخول
+                  </Button>
+                </Link>
               </CardContent>
             </Card>
           </div>

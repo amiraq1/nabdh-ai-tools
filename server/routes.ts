@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertSupplierSchema, insertTransactionSchema } from "@shared/schema";
 import { z } from "zod";
-import { setupAuth, isAuthenticated, requireRole } from "./replitAuth";
+import { setupAuth, isAuthenticated, requireRole } from "./auth";
 import { 
   uploadBackupToGoogleDrive, 
   listBackups, 
@@ -21,12 +21,17 @@ export async function registerRoutes(
 
   app.get("/api/auth/user", async (req: any, res) => {
     try {
-      if (!req.isAuthenticated() || !req.user?.claims?.sub) {
+      if (!req.isAuthenticated() || !req.user?.id) {
         return res.status(401).json({ message: "Unauthorized" });
       }
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const user = await storage.getUser(userId);
-      res.json(user);
+      if (user) {
+        const { password: _, ...userWithoutPassword } = user;
+        res.json(userWithoutPassword);
+      } else {
+        res.status(404).json({ message: "User not found" });
+      }
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ message: "Failed to fetch user" });
@@ -51,7 +56,7 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Invalid role" });
       }
       
-      const currentUserId = req.user?.claims?.sub;
+      const currentUserId = req.user?.id;
       if (currentUserId === req.params.id && role !== "admin") {
         return res.status(403).json({ error: "لا يمكنك خفض رتبتك الخاصة" });
       }
@@ -214,7 +219,7 @@ export async function registerRoutes(
       const transactions = await storage.getTransactions();
       const usersData = await storage.getUsers(1, 10000);
       
-      const currentUserId = req.user?.claims?.sub;
+      const currentUserId = req.user?.id;
       const currentUser = currentUserId ? await storage.getUser(currentUserId) : null;
       const createdBy = currentUser ? {
         id: currentUser.id,
