@@ -139,6 +139,37 @@ export async function setupAuth(app: Express) {
       res.json({ message: "تم تسجيل الخروج بنجاح" });
     });
   });
+
+  app.patch("/api/users/:id/password", isAuthenticated, requireRole(["admin"]), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { password } = req.body;
+
+      if (!password || password.length < 6) {
+        return res.status(400).json({ message: "كلمة المرور يجب أن تكون 6 أحرف على الأقل" });
+      }
+
+      const user = await storage.getUser(id);
+      if (!user) {
+        return res.status(404).json({ message: "المستخدم غير موجود" });
+      }
+
+      const hashedPassword = await bcrypt.hash(password, 10);
+      const updatedUser = await storage.updateUserPassword(id, hashedPassword);
+      
+      if (!updatedUser) {
+        return res.status(500).json({ message: "فشل في تحديث كلمة المرور" });
+      }
+
+      console.log(`Admin ${(req.user as any)?.email} reset password for user ${user.email}`);
+      
+      const { password: _, ...userWithoutPassword } = updatedUser;
+      res.json(userWithoutPassword);
+    } catch (error) {
+      console.error("Password reset error:", error);
+      res.status(500).json({ message: "حدث خطأ في تحديث كلمة المرور" });
+    }
+  });
 }
 
 export const isAuthenticated: RequestHandler = (req, res, next) => {

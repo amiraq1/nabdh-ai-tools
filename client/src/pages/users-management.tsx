@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -20,9 +21,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Users, Shield, ShieldCheck, ShieldAlert, Eye, ChevronRight, ChevronLeft } from "lucide-react";
+import { Users, Shield, ShieldCheck, ShieldAlert, Eye, ChevronRight, ChevronLeft, Key, Loader2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLocation } from "wouter";
 import { useEffect, useState } from "react";
@@ -60,6 +69,10 @@ export default function UsersManagement() {
   const [, setLocation] = useLocation();
   const [page, setPage] = useState(1);
   const limit = 20;
+  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
 
   useEffect(() => {
     if (!authLoading && (!currentUser || currentUser.role !== "admin")) {
@@ -119,6 +132,69 @@ export default function UsersManagement() {
     },
   });
 
+  const updatePasswordMutation = useMutation({
+    mutationFn: async ({ userId, password }: { userId: string; password: string }) => {
+      await apiRequest("PATCH", `/api/users/${userId}/password`, { password });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users"], exact: false });
+      toast({
+        title: "تم تعيين كلمة المرور",
+        description: "تم تعيين كلمة المرور الجديدة بنجاح. يرجى إبلاغ المستخدم بكلمة المرور الجديدة.",
+      });
+      setPasswordDialogOpen(false);
+      setSelectedUser(null);
+      setNewPassword("");
+      setConfirmPassword("");
+    },
+    onError: (error: any) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "غير مصرح",
+          description: "يتم تسجيل الخروج...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "خطأ",
+        description: error.message || "فشل في تعيين كلمة المرور",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSetPassword = () => {
+    if (!selectedUser) return;
+    if (newPassword.length < 6) {
+      toast({
+        title: "خطأ",
+        description: "كلمة المرور يجب أن تكون 6 أحرف على الأقل",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast({
+        title: "خطأ",
+        description: "كلمتا المرور غير متطابقتين",
+        variant: "destructive",
+      });
+      return;
+    }
+    updatePasswordMutation.mutate({ userId: selectedUser.id, password: newPassword });
+  };
+
+  const openPasswordDialog = (user: User) => {
+    setSelectedUser(user);
+    setNewPassword("");
+    setConfirmPassword("");
+    setPasswordDialogOpen(true);
+  };
+
   if (authLoading || !currentUser || currentUser.role !== "admin") {
     return null;
   }
@@ -175,6 +251,7 @@ export default function UsersManagement() {
                   <TableHead>تاريخ الانضمام</TableHead>
                   <TableHead>الصلاحية</TableHead>
                   <TableHead>تغيير الصلاحية</TableHead>
+                  <TableHead>كلمة المرور</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -256,6 +333,18 @@ export default function UsersManagement() {
                             </SelectItem>
                           </SelectContent>
                         </Select>
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => openPasswordDialog(user)}
+                          disabled={user.id === currentUser?.id}
+                          data-testid={`button-set-password-${user.id}`}
+                        >
+                          <Key className="h-4 w-4 ml-1" />
+                          تعيين كلمة مرور
+                        </Button>
                       </TableCell>
                     </TableRow>
                   );
@@ -351,6 +440,74 @@ export default function UsersManagement() {
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={passwordDialogOpen} onOpenChange={setPasswordDialogOpen}>
+        <DialogContent className="sm:max-w-md" dir="rtl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Key className="h-5 w-5" />
+              تعيين كلمة مرور جديدة
+            </DialogTitle>
+            <DialogDescription>
+              تعيين كلمة مرور جديدة للمستخدم: {selectedUser?.email || selectedUser?.firstName}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label htmlFor="new-password" className="text-sm font-medium">
+                كلمة المرور الجديدة
+              </label>
+              <Input
+                id="new-password"
+                type="password"
+                placeholder="أدخل كلمة المرور الجديدة"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                data-testid="input-new-password"
+              />
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="confirm-new-password" className="text-sm font-medium">
+                تأكيد كلمة المرور
+              </label>
+              <Input
+                id="confirm-new-password"
+                type="password"
+                placeholder="أعد إدخال كلمة المرور"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                data-testid="input-confirm-new-password"
+              />
+            </div>
+            <p className="text-sm text-muted-foreground">
+              ملاحظة: يرجى إبلاغ المستخدم بكلمة المرور الجديدة بشكل آمن.
+            </p>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setPasswordDialogOpen(false)}
+              data-testid="button-cancel-password"
+            >
+              إلغاء
+            </Button>
+            <Button
+              onClick={handleSetPassword}
+              disabled={updatePasswordMutation.isPending}
+              data-testid="button-confirm-password"
+            >
+              {updatePasswordMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 ml-2 animate-spin" />
+                  جاري الحفظ...
+                </>
+              ) : (
+                "تعيين كلمة المرور"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
