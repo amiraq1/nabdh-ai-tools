@@ -3,9 +3,13 @@ import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import { setupGracefulShutdown } from "./graceful-shutdown";
+import helmet from "helmet";
 
 const app = express();
 const httpServer = createServer(app);
+
+// Add security headers
+app.use(helmet());
 
 declare module "http" {
   interface IncomingMessage {
@@ -77,6 +81,18 @@ app.use((req, res, next) => {
   // setting up all the other routes so the catch-all route
   // doesn't interfere with the other routes
   if (process.env.NODE_ENV === "production") {
+    // Remove console.log in production
+    app.use((req, res, next) => {
+      if (req.path.startsWith("/api")) {
+        // Overwrite log function to do nothing in production
+        const originalLog = console.log;
+        console.log = () => {};
+        res.on("finish", () => {
+          console.log = originalLog;
+        });
+      }
+      next();
+    });
     serveStatic(app);
   } else {
     const { setupVite } = await import("./vite");
