@@ -9,12 +9,15 @@ import { storage } from "./storage";
 export function getSession() {
   const sessionTtl = 7 * 24 * 60 * 60 * 1000;
   const pgStore = connectPg(session);
+
   const sessionStore = new pgStore({
-    conString: process.env.DATABASE_URL,
-    createTableIfMissing: false,
+    conString: process.env.DATABASE_URL!,
+    // ✅ خليها true عشان ينشئ جدول sessions لو مش موجود
+    createTableIfMissing: true,
     ttl: sessionTtl,
     tableName: "sessions",
   });
+
   return session({
     secret: process.env.SESSION_SECRET!,
     store: sessionStore,
@@ -36,6 +39,7 @@ export async function setupAuth(app: Express) {
   app.use(passport.initialize());
   app.use(passport.session());
 
+  // LocalStrategy لتسجيل الدخول بالبريد وكلمة المرور
   passport.use(
     new LocalStrategy(
       { usernameField: "email", passwordField: "password" },
@@ -57,16 +61,19 @@ export async function setupAuth(app: Express) {
 
           return done(null, user);
         } catch (error) {
+          console.error("LocalStrategy error:", error); // 👈 يساعد في الـ Logs
           return done(error);
         }
       }
     )
   );
 
+  // نخزّن فقط id في الـ session
   passport.serializeUser((user: any, done) => {
     done(null, user.id);
   });
 
+  // نسترجع المستخدم الكامل من الـ DB
   passport.deserializeUser(async (id: string, done) => {
     try {
       const user = await storage.getUser(id);
@@ -91,7 +98,7 @@ export async function setupAuth(app: Express) {
 
       const hashedPassword = await bcrypt.hash(password, 10);
       const usersCount = await storage.getUsersCount();
-      
+
       const user = await storage.createUser({
         email,
         password: hashedPassword,
@@ -102,6 +109,7 @@ export async function setupAuth(app: Express) {
 
       req.login(user, (err) => {
         if (err) {
+          console.error("Login after register error:", err);
           return res.status(500).json({ message: "خطأ في تسجيل الدخول" });
         }
         const { password: _, ...userWithoutPassword } = user;
@@ -116,13 +124,17 @@ export async function setupAuth(app: Express) {
   app.post("/api/auth/login", (req, res, next) => {
     passport.authenticate("local", (err: any, user: any, info: any) => {
       if (err) {
+        console.error("Login strategy error:", err); // 👈 يوضح السبب في الـ Logs
         return res.status(500).json({ message: "خطأ في الخادم" });
       }
       if (!user) {
-        return res.status(401).json({ message: info?.message || "فشل تسجيل الدخول" });
+        return res
+          .status(401)
+          .json({ message: info?.message || "فشل تسجيل الدخول" });
       }
       req.login(user, (err) => {
         if (err) {
+          console.error("Session save error:", err); // 👈 لو المشكلة من sessions
           return res.status(500).json({ message: "خطأ في تسجيل الدخول" });
         }
         const { password: _, ...userWithoutPassword } = user;
@@ -140,38 +152,48 @@ export async function setupAuth(app: Express) {
     });
   });
 
-  app.patch("/api/users/:id/password", isAuthenticated, requireRole(["admin"]), async (req, res) => {
-    try {
-      const { id } = req.params;
-      const { password } = req.body;
+  app.patch(
+    "/api/users/:id/password",
+    isAuthenticated,
+    requireRole(["admin"]),
+    async (req, res) => {
+      try {
+        const { id } = req.params;
+        const { password } = req.body;
 
-      if (!password || password.length < 6) {
-        return res.status(400).json({ message: "كلمة المرور يجب أن تكون 6 أحرف على الأقل" });
+        if (!password || password.length < 6) {
+          return res
+            .status(400)
+            .json({ message: "كلمة المرور يجب أن تكون 6 أحرف على الأقل" });
+        }
+
+        const user = await storage.getUser(id);
+        if (!user) {
+          return res.status(404).json({ message: "المستخدم غير موجود" });
+        }
+
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const updatedUser = await storage.updateUserPassword(id, hashedPassword);
+
+        if (!updatedUser) {
+          return res.status(500).json({ message: "فشل في تحديث كلمة المرور" });
+        }
+
+        console.log(
+          `Admin ${(req.user as any)?.email} reset password for user ${user.email}`
+        );
+
+        const { password: _, ...userWithoutPassword } = updatedUser;
+        res.json(userWithoutPassword);
+      } catch (error) {
+        console.error("Password reset error:", error);
+        res.status(500).json({ message: "حدث خطأ في تحديث كلمة المرور" });
       }
-
-      const user = await storage.getUser(id);
-      if (!user) {
-        return res.status(404).json({ message: "المستخدم غير موجود" });
-      }
-
-      const hashedPassword = await bcrypt.hash(password, 10);
-      const updatedUser = await storage.updateUserPassword(id, hashedPassword);
-      
-      if (!updatedUser) {
-        return res.status(500).json({ message: "فشل في تحديث كلمة المرور" });
-      }
-
-      console.log(`Admin ${(req.user as any)?.email} reset password for user ${user.email}`);
-      
-      const { password: _, ...userWithoutPassword } = updatedUser;
-      res.json(userWithoutPassword);
-    } catch (error) {
-      console.error("Password reset error:", error);
-      res.status(500).json({ message: "حدث خطأ في تحديث كلمة المرور" });
     }
-  });
+  );
 }
 
+// middlewares
 export const isAuthenticated: RequestHandler = (req, res, next) => {
   if (req.isAuthenticated()) {
     return next();
