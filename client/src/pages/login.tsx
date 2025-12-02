@@ -68,7 +68,7 @@ export default function Login() {
         title: "تم تسجيل الدخول بنجاح",
         description: "مرحباً بك في نظام إدارة الموردين",
       });
-      navigate("/");
+      navigate("/dashboard");
     },
     onError: (error: any) => {
       toast({
@@ -95,7 +95,7 @@ export default function Login() {
         title: "تم إنشاء الحساب بنجاح",
         description: "مرحباً بك في نظام إدارة الموردين",
       });
-      navigate("/");
+      navigate("/dashboard");
     },
     onError: (error: any) => {
       toast({
