@@ -310,7 +310,10 @@ export default function Login() {
                   )}
                 </Button>
               </form>
-              <div className="relative">
+            )}
+            {isRegister ? null : (
+              <>
+                <div className="relative mt-4">
                 <div className="absolute inset-0 flex items-center">
                   <span className="w-full border-t" />
                 </div>
@@ -329,6 +332,7 @@ export default function Login() {
                 <FcGoogle className="h-5 w-5 ml-2" />
                 تسجيل الدخول عبر Google
               </Button>
+              </>
             )}
           </CardContent>
           <CardFooter className="flex flex-col gap-4">
@@ -371,3 +375,5 @@ export default function Login() {
     </div>
   );
 }
+
+
