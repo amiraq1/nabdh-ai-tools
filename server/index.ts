@@ -1,8 +1,11 @@
+import "dotenv/config";
 import express, { type Request, Response, NextFunction } from "express";
+import compression from "compression";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import { setupGracefulShutdown } from "./graceful-shutdown";
+import { setupSecurityHeaders, generalRateLimiter } from "./security";
 
 const app = express();
 const httpServer = createServer(app);
@@ -13,15 +16,35 @@ declare module "http" {
   }
 }
 
+// Security headers (must be first)
+setupSecurityHeaders(app);
+
+// Rate limiting for all requests
+app.use(generalRateLimiter);
+
+// Compression middleware - compress all responses
+app.use(compression({
+  level: 6, // Compression level (1-9, 6 is a good balance)
+  filter: (req: express.Request, res: express.Response) => {
+    // Don't compress if client doesn't support it
+    if (req.headers['x-no-compression']) {
+      return false;
+    }
+    // Use compression for all text-based responses
+    return compression.filter(req, res);
+  }
+}));
+
 app.use(
   express.json({
     verify: (req, _res, buf) => {
       req.rawBody = buf;
     },
+    limit: '10mb', // Limit JSON payload size
   }),
 );
 
-app.use(express.urlencoded({ extended: false }));
+app.use(express.urlencoded({ extended: false, limit: '10mb' }));
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
@@ -65,10 +88,19 @@ app.use((req, res, next) => {
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
-
-    // Log the error for debugging
-    console.error("[ERROR]", err);
+    
+    // Log the error for debugging (server-side only)
+    console.error("[ERROR]", {
+      message: err.message,
+      stack: process.env.NODE_ENV === "development" ? err.stack : undefined,
+      status,
+      timestamp: new Date().toISOString(),
+    });
+    
+    // Don't expose internal error details to clients
+    const message = status === 500 
+      ? "حدث خطأ في الخادم. يرجى المحاولة لاحقاً."
+      : err.message || "حدث خطأ";
     
     res.status(status).json({ message });
   });
@@ -87,16 +119,18 @@ app.use((req, res, next) => {
   // Railway uses port 8080 by default, Replit uses 5000
   // this serves both the API and the client.
   const port = parseInt(process.env.PORT || "8080", 10);
+  // On Windows, use localhost instead of 0.0.0.0 to avoid ENOTSUP error
+  const host = process.platform === "win32" ? "localhost" : "0.0.0.0";
+  const listenOptions = process.platform === "win32" 
+    ? { port, host }
+    : { port, host, reusePort: true };
+  
   httpServer.listen(
-    {
-      port,
-      host: "0.0.0.0",
-      reusePort: true,
-    },
+    listenOptions,
     () => {
       log(`serving on port ${port}`);
       log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-      log(`Health check available at: http://0.0.0.0:${port}/health`);
+      log(`Health check available at: http://${host}:${port}/health`);
     },
   );
   

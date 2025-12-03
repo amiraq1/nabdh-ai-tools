@@ -1,10 +1,10 @@
 // server/drizzle-migrate.ts
 import { migrate } from "drizzle-orm/node-postgres/migrator";
-import { pool } from "./db";
+import { db, pool } from "./db";
 
 async function main() {
   console.log("Running drizzle migrations...");
-  await migrate(pool, { migrationsFolder: "./drizzle" });
+  await migrate(db, { migrationsFolder: "./drizzle" });
   await pool.end();
   console.log("Migrations applied");
 }

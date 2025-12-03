@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { insertSupplierSchema, insertTransactionSchema } from "@shared/schema";
 import { z } from "zod";
 import { setupAuth, isAuthenticated, requireRole } from "./auth";
+import { apiRateLimiter } from "./security";
 import { 
   uploadBackupToGoogleDrive, 
   listBackups, 
@@ -55,7 +56,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/users", isAuthenticated, requireRole(["admin"]), async (req, res) => {
+  app.get("/api/users", apiRateLimiter, isAuthenticated, requireRole(["admin"]), async (req, res) => {
     try {
       const page = Math.max(1, parseInt(req.query.page as string) || 1);
       const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 20));

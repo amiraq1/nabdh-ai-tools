@@ -6,6 +6,13 @@ export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  upsertUser(user: {
+    id: string;
+    email?: string | null;
+    firstName?: string | null;
+    lastName?: string | null;
+    profileImageUrl?: string | null;
+  }): Promise<User>;
   getUsersCount(): Promise<number>;
   getUsers(page?: number, limit?: number): Promise<{ users: User[]; total: number; page: number; limit: number; totalPages: number }>;
   updateUserRole(id: string, role: string): Promise<User | undefined>;
@@ -41,6 +48,46 @@ export class DatabaseStorage implements IStorage {
       .insert(users)
       .values({ ...userData, role: userData.role || "viewer" })
       .returning();
+    return user;
+  }
+
+  async upsertUser(userData: {
+    id: string;
+    email?: string | null;
+    firstName?: string | null;
+    lastName?: string | null;
+    profileImageUrl?: string | null;
+  }): Promise<User> {
+    const existing = await this.getUser(userData.id);
+
+    if (existing) {
+      const [user] = await db
+        .update(users)
+        .set({
+          email: userData.email ?? existing.email,
+          firstName: userData.firstName ?? existing.firstName,
+          lastName: userData.lastName ?? existing.lastName,
+          profileImageUrl: userData.profileImageUrl ?? existing.profileImageUrl,
+          updatedAt: new Date(),
+        })
+        .where(eq(users.id, userData.id))
+        .returning();
+
+      return user;
+    }
+
+    const [user] = await db
+      .insert(users)
+      .values({
+        id: userData.id,
+        email: userData.email ?? null,
+        firstName: userData.firstName ?? null,
+        lastName: userData.lastName ?? null,
+        profileImageUrl: userData.profileImageUrl ?? null,
+        role: "viewer",
+      })
+      .returning();
+
     return user;
   }
 

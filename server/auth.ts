@@ -1,10 +1,20 @@
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
+import {
+  Strategy as GoogleStrategy,
+  type Profile as GoogleProfile,
+} from "passport-google-oauth20";
+import {
+  Strategy as GithubStrategy,
+  type Profile as GithubProfile,
+} from "passport-github2";
+import { Strategy as MicrosoftStrategy } from "passport-microsoft";
 import session from "express-session";
 import type { Express, RequestHandler } from "express";
 import connectPg from "connect-pg-simple";
 import bcrypt from "bcrypt";
 import { storage } from "./storage";
+import { authRateLimiter, validatePasswordStrength, isValidEmail, sanitizeInput } from "./security";
 
 export function getSession() {
   const sessionTtl = 7 * 24 * 60 * 60 * 1000;
@@ -24,12 +34,15 @@ export function getSession() {
     resave: false,
     saveUninitialized: false,
     proxy: true,
+    name: "sessionId", // Don't use default 'connect.sid'
     cookie: {
-      httpOnly: true,
-      secure: "auto",
-      sameSite: "lax",
+      httpOnly: true, // Prevent XSS attacks
+      secure: process.env.NODE_ENV === "production" ? true : "auto", // HTTPS only in production
+      sameSite: "lax", // CSRF protection
       maxAge: sessionTtl,
+      domain: process.env.COOKIE_DOMAIN || undefined, // Set domain if needed
     },
+    rolling: true, // Reset expiration on activity
   });
 }
 
@@ -54,8 +67,11 @@ export async function setupAuth(app: Express) {
             return done(null, false, { message: "يرجى إعادة تعيين كلمة المرور" });
           }
 
+          // Add small delay to prevent timing attacks
           const isValid = await bcrypt.compare(password, user.password);
           if (!isValid) {
+            // Add delay even on failure to prevent timing attacks
+            await new Promise(resolve => setTimeout(resolve, 100));
             return done(null, false, { message: "كلمة المرور غير صحيحة" });
           }
 
@@ -67,6 +83,211 @@ export async function setupAuth(app: Express) {
       }
     )
   );
+
+  // Helper: upsert user from social profile
+  async function findOrCreateOAuthUser(params: {
+    email?: string | null;
+    firstName?: string | null;
+    lastName?: string | null;
+    profileImageUrl?: string | null;
+    providerId: string;
+  }) {
+    const email = params.email ?? undefined;
+
+    if (!email) {
+      // بدون بريد لا نستطيع ربط الحساب بمستخدم
+      throw new Error("No email returned from OAuth provider");
+    }
+
+    let user = await storage.getUserByEmail(email);
+
+    if (!user) {
+      const usersCount = await storage.getUsersCount();
+      user = await storage.createUser({
+        email,
+        password: null,
+        firstName: params.firstName ?? null,
+        lastName: params.lastName ?? null,
+        profileImageUrl: params.profileImageUrl ?? null,
+        role: usersCount === 0 ? "admin" : "viewer",
+      });
+    }
+
+    return user;
+  }
+
+  // Google OAuth2
+  if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+    passport.use(
+      new GoogleStrategy(
+        {
+          clientID: process.env.GOOGLE_CLIENT_ID,
+          clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+          callbackURL: process.env.GOOGLE_CALLBACK_URL || "/api/auth/google/callback",
+        },
+        async (_accessToken, _refreshToken, profile: GoogleProfile, done) => {
+          try {
+            const email = profile.emails?.[0]?.value || null;
+            const firstName = profile.name?.givenName || null;
+            const lastName = profile.name?.familyName || null;
+            const avatar =
+              (profile.photos && profile.photos[0]?.value) || null;
+
+            const user = await findOrCreateOAuthUser({
+              email,
+              firstName,
+              lastName,
+              profileImageUrl: avatar,
+              providerId: profile.id,
+            });
+
+            done(null, user);
+          } catch (error) {
+            done(error as any);
+          }
+        },
+      ),
+    );
+
+    app.get(
+      "/api/auth/google",
+      passport.authenticate("google", {
+        scope: ["profile", "email"],
+      }),
+    );
+
+    app.get(
+      "/api/auth/google/callback",
+      passport.authenticate("google", {
+        failureRedirect: "/login",
+      }),
+      (req, res) => {
+        // نجاح: أعد التوجيه للواجهة الرئيسية
+        res.redirect("/");
+      },
+    );
+  }
+
+  // GitHub OAuth2
+  if (process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET) {
+    passport.use(
+      new GithubStrategy(
+        {
+          clientID: process.env.GITHUB_CLIENT_ID,
+          clientSecret: process.env.GITHUB_CLIENT_SECRET,
+          callbackURL: process.env.GITHUB_CALLBACK_URL || "/api/auth/github/callback",
+          scope: ["user:email"],
+        },
+        async (
+          _accessToken: string,
+          _refreshToken: string,
+          profile: GithubProfile,
+          done: (err: any, user?: any) => void,
+        ) => {
+          try {
+            const primaryEmail =
+              (profile.emails && profile.emails[0]?.value) || null;
+            const displayName = profile.displayName || profile.username || "";
+            const [firstName, ...rest] = displayName.split(" ");
+            const lastName = rest.join(" ") || null;
+            const avatar =
+              (profile.photos && profile.photos[0]?.value) || null;
+
+            const user = await findOrCreateOAuthUser({
+              email: primaryEmail,
+              firstName: firstName || null,
+              lastName,
+              profileImageUrl: avatar,
+              providerId: profile.id,
+            });
+
+            done(null, user);
+          } catch (error) {
+            done(error as any);
+          }
+        },
+      ),
+    );
+
+    app.get("/api/auth/github", passport.authenticate("github"));
+
+    app.get(
+      "/api/auth/github/callback",
+      passport.authenticate("github", {
+        failureRedirect: "/login",
+      }),
+      (req, res) => {
+        res.redirect("/");
+      },
+    );
+  }
+
+  // Microsoft OAuth2
+  if (process.env.MS_CLIENT_ID && process.env.MS_CLIENT_SECRET) {
+    passport.use(
+      new MicrosoftStrategy(
+        {
+          clientID: process.env.MS_CLIENT_ID,
+          clientSecret: process.env.MS_CLIENT_SECRET,
+          callbackURL:
+            process.env.MS_CALLBACK_URL ||
+            "/api/auth/microsoft/callback",
+          scope: ["user.read"],
+          tenant: "common",
+        },
+        async (
+          _accessToken: string,
+          _refreshToken: string,
+          profile: any,
+          done: (err: any, user?: any) => void,
+        ) => {
+          try {
+            const email =
+              (profile.emails && profile.emails[0]?.value) ||
+              profile._json?.mail ||
+              profile._json?.userPrincipalName ||
+              null;
+            const firstName =
+              profile.name?.givenName || profile._json?.givenName || null;
+            const lastName =
+              profile.name?.familyName || profile._json?.surname || null;
+            const avatar =
+              (profile.photos && profile.photos[0]?.value) || null;
+
+            const user = await findOrCreateOAuthUser({
+              email,
+              firstName,
+              lastName,
+              profileImageUrl: avatar,
+              providerId: profile.id,
+            });
+
+            done(null, user);
+          } catch (error) {
+            done(error as any);
+          }
+        },
+      ),
+    );
+
+    app.get(
+      "/api/auth/microsoft",
+      passport.authenticate("microsoft", {
+        // تطلب صلاحية قراءة بيانات المستخدم الأساسية
+        prompt: "select_account",
+      }),
+    );
+
+    app.get(
+      "/api/auth/microsoft/callback",
+      passport.authenticate("microsoft", {
+        failureRedirect: "/login",
+      }),
+      (req, res) => {
+        res.redirect("/");
+      },
+    );
+  }
 
   // نخزّن فقط id في الـ session
   passport.serializeUser((user: any, done) => {
@@ -83,27 +304,43 @@ export async function setupAuth(app: Express) {
     }
   });
 
-  app.post("/api/auth/register", async (req, res) => {
+  app.post("/api/auth/register", authRateLimiter, async (req, res) => {
     try {
-      const { email, password, firstName, lastName } = req.body;
+      let { email, password, firstName, lastName } = req.body;
 
+      // Validate and sanitize input
       if (!email || !password) {
         return res.status(400).json({ message: "البريد الإلكتروني وكلمة المرور مطلوبان" });
       }
+
+      email = sanitizeInput(email.toLowerCase().trim());
+      
+      if (!isValidEmail(email)) {
+        return res.status(400).json({ message: "البريد الإلكتروني غير صالح" });
+      }
+
+      // Validate password strength
+      const passwordValidation = validatePasswordStrength(password);
+      if (!passwordValidation.valid) {
+        return res.status(400).json({ message: passwordValidation.message });
+      }
+
+      firstName = firstName ? sanitizeInput(firstName) : null;
+      lastName = lastName ? sanitizeInput(lastName) : null;
 
       const existingUser = await storage.getUserByEmail(email);
       if (existingUser) {
         return res.status(400).json({ message: "البريد الإلكتروني مستخدم بالفعل" });
       }
 
-      const hashedPassword = await bcrypt.hash(password, 10);
+      const hashedPassword = await bcrypt.hash(password, 12); // Increased rounds for better security
       const usersCount = await storage.getUsersCount();
 
       const user = await storage.createUser({
         email,
         password: hashedPassword,
-        firstName: firstName || null,
-        lastName: lastName || null,
+        firstName,
+        lastName,
         role: usersCount === 0 ? "admin" : "viewer",
       });
 
@@ -121,7 +358,7 @@ export async function setupAuth(app: Express) {
     }
   });
 
-  app.post("/api/auth/login", (req, res, next) => {
+  app.post("/api/auth/login", authRateLimiter, (req, res, next) => {
     passport.authenticate("local", (err: any, user: any, info: any) => {
       if (err) {
         console.error("Login strategy error:", err); // 👈 يوضح السبب في الـ Logs
@@ -161,10 +398,10 @@ export async function setupAuth(app: Express) {
         const { id } = req.params;
         const { password } = req.body;
 
-        if (!password || password.length < 6) {
-          return res
-            .status(400)
-            .json({ message: "كلمة المرور يجب أن تكون 6 أحرف على الأقل" });
+        // Validate password strength
+        const passwordValidation = validatePasswordStrength(password);
+        if (!passwordValidation.valid) {
+          return res.status(400).json({ message: passwordValidation.message });
         }
 
         const user = await storage.getUser(id);
