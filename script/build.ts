@@ -59,9 +59,27 @@ async function buildAll() {
     external: externals,
     logLevel: "info",
   });
+
+  // Build drizzle migration script
+  console.log("building drizzle migration script...");
+  await esbuild({
+    entryPoints: ["server/drizzle-migrate.ts"],
+    platform: "node",
+    bundle: true,
+    format: "cjs",
+    outfile: "dist/drizzle-migrate.cjs",
+    define: {
+      "process.env.NODE_ENV": '"production"',
+    },
+    minify: true,
+    external: externals,
+    logLevel: "info",
+  });
 }
 
 buildAll().catch((err) => {
-  console.error(err);
+  console.error("Build failed:", err);
   process.exit(1);
 });
+
+
