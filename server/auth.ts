@@ -1,5 +1,6 @@
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
+import { OAuth2Strategy as GoogleStrategy } from "passport-google-oauth20";
 import session from "express-session";
 import type { Express, RequestHandler } from "express";
 import connectPg from "connect-pg-simple";
@@ -62,6 +63,46 @@ export async function setupAuth(app: Express) {
           return done(null, user);
         } catch (error) {
           console.error("LocalStrategy error:", error); // 👈 يساعد في الـ Logs
+          return done(error);
+        }
+      }
+    )
+  );
+
+  // Google OAuth Strategy
+  passport.use(
+    new GoogleStrategy(
+      {
+        clientID: process.env.GOOGLE_CLIENT_ID!,
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+        callbackURL: process.env.GOOGLE_CALLBACK_URL!,
+        scope: ["profile", "email"],
+      },
+      async (accessToken, refreshToken, profile, done) => {
+        try {
+          const email = profile.emails?.[0]?.value;
+          if (!email) {
+            return done(new Error("Google profile missing email"), false);
+          }
+
+          let user = await storage.getUserByEmail(email);
+
+          if (user) {
+            return done(null, user);
+          } else {
+            // User does not exist, create a new one
+            const usersCount = await storage.getUsersCount();
+            const newUser = await storage.createUser({
+              email,
+              firstName: profile.name?.givenName || null,
+              lastName: profile.name?.familyName || null,
+              role: usersCount === 0 ? "admin" : "viewer",
+              // No password for OAuth users
+            });
+            return done(null, newUser);
+          }
+        } catch (error) {
+          console.error("GoogleStrategy error:", error);
           return done(error);
         }
       }
@@ -142,6 +183,24 @@ export async function setupAuth(app: Express) {
       });
     })(req, res, next);
   });
+
+  // Google OAuth Routes
+  app.get(
+    "/api/auth/google",
+    passport.authenticate("google", { scope: ["profile", "email"] })
+  );
+
+  app.get(
+    "/api/auth/google/callback",
+    passport.authenticate("google", {
+      failureRedirect: "/login",
+      session: true,
+    }),
+    (req, res) => {
+      // Successful authentication, redirect home.
+      res.redirect("/"); // Client-side will handle redirect to /dashboard
+    }
+  );
 
   app.post("/api/auth/logout", (req, res) => {
     req.logout((err) => {

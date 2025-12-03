@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { TrendingUp, Loader2, Eye, EyeOff } from "lucide-react";
+import { FcGoogle } from "react-icons/fc";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
@@ -309,6 +310,25 @@ export default function Login() {
                   )}
                 </Button>
               </form>
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-card px-2 text-muted-foreground">
+                    أو
+                  </span>
+                </div>
+              </div>
+              <Button 
+                variant="outline" 
+                className="w-full" 
+                onClick={() => window.location.href = "/api/auth/google"}
+                data-testid="button-google-login"
+              >
+                <FcGoogle className="h-5 w-5 ml-2" />
+                تسجيل الدخول عبر Google
+              </Button>
             )}
           </CardContent>
           <CardFooter className="flex flex-col gap-4">
