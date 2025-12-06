@@ -230,7 +230,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/google-drive/status", isAuthenticated, requireRole(["admin"]), async (_req, res) => {
+  app.get("/api/google-drive/status", isAuthenticated, requireRole(adminOnly), async (_req, res) => {
     try {
       const status = await checkGoogleDriveConnection();
       res.json(status);
@@ -239,7 +239,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/google-drive/backups", isAuthenticated, requireRole(["admin"]), async (_req, res) => {
+  app.get("/api/google-drive/backups", isAuthenticated, requireRole(adminOnly), async (_req, res) => {
     try {
       const backups = await listBackups();
       res.json(backups);
@@ -248,7 +248,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/google-drive/backup", isAuthenticated, requireRole(["admin"]), async (req: any, res) => {
+  app.post("/api/google-drive/backup", isAuthenticated, requireRole(adminOnly), async (req: Request, res) => {
     try {
       const suppliers = await storage.getSuppliers();
       const transactions = await storage.getTransactions();
@@ -275,7 +275,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/google-drive/backups/:fileId", isAuthenticated, requireRole(["admin"]), async (req, res) => {
+  app.get("/api/google-drive/backups/:fileId", isAuthenticated, requireRole(adminOnly), async (req, res) => {
     try {
       const backup = await downloadBackup(req.params.fileId);
       res.json(backup);
@@ -284,7 +284,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/google-drive/backups/:fileId", isAuthenticated, requireRole(["admin"]), async (req, res) => {
+  app.delete("/api/google-drive/backups/:fileId", isAuthenticated, requireRole(adminOnly), async (req, res) => {
     try {
       await deleteBackup(req.params.fileId);
       res.status(204).send();
