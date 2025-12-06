@@ -17,6 +17,7 @@ import { storage } from "./storage";
 import { userRoles, type UserRole } from "@shared/schema";
 import { authRateLimiter, validatePasswordStrength, isValidEmail, sanitizeInput } from "./security";
 import { env } from "./config";
+import { logger } from "./logger";
 
 const isUserRole = (role: unknown): role is UserRole =>
   typeof role === "string" && (userRoles as readonly string[]).includes(role);
@@ -42,7 +43,7 @@ export function getSession() {
     name: "sessionId", // Don't use default 'connect.sid'
     cookie: {
       httpOnly: true, // Prevent XSS attacks
-      secure: env.NODE_ENV === "production", // HTTPS only in production
+      secure: env.SESSION_COOKIE_SECURE, // HTTPS only in production or if forced
       sameSite: "lax", // CSRF protection
       maxAge: sessionTtl,
       domain: env.COOKIE_DOMAIN || undefined, // Set domain if needed
