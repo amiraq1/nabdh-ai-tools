@@ -75,7 +75,7 @@ export async function registerRoutes(
       }
       
       const currentUserId = req.user?.id;
-      if (currentUserId === req.params.id && role !== "admin") {
+      if (currentUserId !== undefined && String(currentUserId) === String(req.params.id) && role !== "admin") {
         return res.status(403).json({ error: "لا يمكنك خفض رتبتك الخاصة" });
       }
       

@@ -1,4 +1,5 @@
 import { google } from 'googleapis';
+import { env } from "./config";
 
 let connectionSettings: any;
 
@@ -7,11 +8,11 @@ async function getAccessToken() {
     return connectionSettings.settings.access_token;
   }
   
-  const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
-  const xReplitToken = process.env.REPL_IDENTITY 
-    ? 'repl ' + process.env.REPL_IDENTITY 
-    : process.env.WEB_REPL_RENEWAL 
-    ? 'depl ' + process.env.WEB_REPL_RENEWAL 
+  const hostname = env.REPLIT_CONNECTORS_HOSTNAME;
+  const xReplitToken = env.REPL_IDENTITY 
+    ? 'repl ' + env.REPL_IDENTITY 
+    : env.WEB_REPL_RENEWAL 
+    ? 'depl ' + env.WEB_REPL_RENEWAL 
     : null;
 
   if (!xReplitToken) {

@@ -15,13 +15,14 @@ import connectPg from "connect-pg-simple";
 import bcrypt from "bcrypt";
 import { storage } from "./storage";
 import { authRateLimiter, validatePasswordStrength, isValidEmail, sanitizeInput } from "./security";
+import { env } from "./config";
 
 export function getSession() {
   const sessionTtl = 7 * 24 * 60 * 60 * 1000;
   const pgStore = connectPg(session);
 
   const sessionStore = new pgStore({
-    conString: process.env.DATABASE_URL!,
+    conString: env.DATABASE_URL,
     // ✅ خليها true عشان ينشئ جدول sessions لو مش موجود
     createTableIfMissing: true,
     ttl: sessionTtl,
@@ -29,7 +30,7 @@ export function getSession() {
   });
 
   return session({
-    secret: process.env.SESSION_SECRET!,
+    secret: env.SESSION_SECRET,
     store: sessionStore,
     resave: false,
     saveUninitialized: false,
@@ -37,10 +38,10 @@ export function getSession() {
     name: "sessionId", // Don't use default 'connect.sid'
     cookie: {
       httpOnly: true, // Prevent XSS attacks
-      secure: process.env.NODE_ENV === "production" ? true : "auto", // HTTPS only in production
+      secure: env.NODE_ENV === "production", // HTTPS only in production
       sameSite: "lax", // CSRF protection
       maxAge: sessionTtl,
-      domain: process.env.COOKIE_DOMAIN || undefined, // Set domain if needed
+      domain: env.COOKIE_DOMAIN || undefined, // Set domain if needed
     },
     rolling: true, // Reset expiration on activity
   });
@@ -117,13 +118,13 @@ export async function setupAuth(app: Express) {
   }
 
   // Google OAuth2
-  if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+  if (env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET) {
     passport.use(
       new GoogleStrategy(
         {
-          clientID: process.env.GOOGLE_CLIENT_ID,
-          clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-          callbackURL: process.env.GOOGLE_CALLBACK_URL || "/api/auth/google/callback",
+          clientID: env.GOOGLE_CLIENT_ID,
+          clientSecret: env.GOOGLE_CLIENT_SECRET,
+          callbackURL: env.GOOGLE_CALLBACK_URL || "/api/auth/google/callback",
         },
         async (_accessToken, _refreshToken, profile: GoogleProfile, done) => {
           try {
@@ -169,13 +170,13 @@ export async function setupAuth(app: Express) {
   }
 
   // GitHub OAuth2
-  if (process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET) {
+  if (env.GITHUB_CLIENT_ID && env.GITHUB_CLIENT_SECRET) {
     passport.use(
       new GithubStrategy(
         {
-          clientID: process.env.GITHUB_CLIENT_ID,
-          clientSecret: process.env.GITHUB_CLIENT_SECRET,
-          callbackURL: process.env.GITHUB_CALLBACK_URL || "/api/auth/github/callback",
+          clientID: env.GITHUB_CLIENT_ID,
+          clientSecret: env.GITHUB_CLIENT_SECRET,
+          callbackURL: env.GITHUB_CALLBACK_URL || "/api/auth/github/callback",
           scope: ["user:email"],
         },
         async (
@@ -223,14 +224,14 @@ export async function setupAuth(app: Express) {
   }
 
   // Microsoft OAuth2
-  if (process.env.MS_CLIENT_ID && process.env.MS_CLIENT_SECRET) {
+  if (env.MS_CLIENT_ID && env.MS_CLIENT_SECRET) {
     passport.use(
       new MicrosoftStrategy(
         {
-          clientID: process.env.MS_CLIENT_ID,
-          clientSecret: process.env.MS_CLIENT_SECRET,
+          clientID: env.MS_CLIENT_ID,
+          clientSecret: env.MS_CLIENT_SECRET,
           callbackURL:
-            process.env.MS_CALLBACK_URL ||
+            env.MS_CALLBACK_URL ||
             "/api/auth/microsoft/callback",
           scope: ["user.read"],
           tenant: "common",

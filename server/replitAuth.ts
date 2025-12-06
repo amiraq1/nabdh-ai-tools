@@ -7,12 +7,16 @@ import type { Express, RequestHandler } from "express";
 import memoize from "memoizee";
 import connectPg from "connect-pg-simple";
 import { storage } from "./storage";
+import { env } from "./config";
 
 const getOidcConfig = memoize(
   async () => {
+    if (!env.REPL_ID) {
+      throw new Error("REPL_ID must be set for Replit auth");
+    }
     return await client.discovery(
-      new URL(process.env.ISSUER_URL ?? "https://replit.com/oidc"),
-      process.env.REPL_ID!
+      new URL(env.ISSUER_URL ?? "https://replit.com/oidc"),
+      env.REPL_ID
     );
   },
   { maxAge: 3600 * 1000 }
@@ -22,20 +26,20 @@ export function getSession() {
   const sessionTtl = 7 * 24 * 60 * 60 * 1000;
   const pgStore = connectPg(session);
   const sessionStore = new pgStore({
-    conString: process.env.DATABASE_URL,
+    conString: env.DATABASE_URL,
     createTableIfMissing: false,
     ttl: sessionTtl,
     tableName: "sessions",
   });
   return session({
-    secret: process.env.SESSION_SECRET!,
+    secret: env.SESSION_SECRET,
     store: sessionStore,
     resave: false,
     saveUninitialized: false,
     proxy: true,
     cookie: {
       httpOnly: true,
-      secure: "auto",
+      secure: env.NODE_ENV === "production",
       sameSite: "lax",
       maxAge: sessionTtl,
     },
@@ -120,9 +124,13 @@ export async function setupAuth(app: Express) {
 
   app.get("/api/logout", (req, res) => {
     req.logout(() => {
+      if (!env.REPL_ID) {
+        res.status(500).json({ message: "REPL_ID is required for logout" });
+        return;
+      }
       res.redirect(
         client.buildEndSessionUrl(config, {
-          client_id: process.env.REPL_ID!,
+          client_id: env.REPL_ID,
           post_logout_redirect_uri: `${req.protocol}://${req.hostname}`,
         }).href
       );
