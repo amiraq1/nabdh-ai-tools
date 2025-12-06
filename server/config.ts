@@ -1,5 +1,14 @@
 import { z } from "zod";
 
+const toBoolean = (value: unknown) => {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value === "boolean") return value;
+  const normalized = String(value).trim().toLowerCase();
+  if (normalized === "true" || normalized === "1" || normalized === "yes") return true;
+  if (normalized === "false" || normalized === "0" || normalized === "no") return false;
+  return undefined;
+};
+
 const EnvSchema = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
   PORT: z.coerce.number().int().positive().default(8080),
@@ -7,15 +16,16 @@ const EnvSchema = z.object({
   SESSION_SECRET: z.string().min(16),
   COOKIE_DOMAIN: z.string().optional(),
   LOG_LEVEL: z.string().optional(),
-  DB_SSL_REJECT_UNAUTHORIZED: z
-    .string()
+  SESSION_COOKIE_SECURE: z
+    .any()
     .optional()
-    .transform((val) => {
-      if (val === undefined) return undefined;
-      if (val === "false") return false;
-      if (val === "true") return true;
-      return undefined;
-    }),
+    .transform(toBoolean)
+    .pipe(z.boolean().optional()),
+  DB_SSL_REQUIRED: z
+    .any()
+    .optional()
+    .transform(toBoolean)
+    .pipe(z.boolean().optional()),
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
   GOOGLE_CALLBACK_URL: z.string().optional(),
@@ -32,4 +42,11 @@ const EnvSchema = z.object({
   REPLIT_CONNECTORS_HOSTNAME: z.string().optional(),
 });
 
-export const env = EnvSchema.parse(process.env);
+const rawEnv = EnvSchema.parse(process.env);
+
+export const env = {
+  ...rawEnv,
+  SESSION_COOKIE_SECURE:
+    rawEnv.SESSION_COOKIE_SECURE ?? rawEnv.NODE_ENV === "production",
+  DB_SSL_REQUIRED: rawEnv.DB_SSL_REQUIRED ?? rawEnv.NODE_ENV === "production",
+};
