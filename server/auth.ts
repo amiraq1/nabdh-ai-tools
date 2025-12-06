@@ -14,9 +14,12 @@ import type { Express, RequestHandler } from "express";
 import connectPg from "connect-pg-simple";
 import bcrypt from "bcrypt";
 import { storage } from "./storage";
-import type { UserRole } from "@shared/schema";
+import { userRoles, type UserRole } from "@shared/schema";
 import { authRateLimiter, validatePasswordStrength, isValidEmail, sanitizeInput } from "./security";
 import { env } from "./config";
+
+const isUserRole = (role: unknown): role is UserRole =>
+  typeof role === "string" && (userRoles as readonly string[]).includes(role);
 
 export function getSession() {
   const sessionTtl = 7 * 24 * 60 * 60 * 1000;
@@ -448,7 +451,9 @@ export const requireRole = (roles: UserRole[]): RequestHandler => {
     }
 
     const dbUser = await storage.getUser(user.id);
-    if (!dbUser || !roles.includes(dbUser.role)) {
+    const dbUserRole = isUserRole(dbUser?.role) ? dbUser.role : null;
+
+    if (!dbUserRole || !roles.includes(dbUserRole)) {
       return res.status(403).json({ message: "Forbidden" });
     }
 
