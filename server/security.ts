@@ -2,23 +2,49 @@
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import type { Express } from "express";
+import { env } from "./config";
+
+const isDevelopment = env.NODE_ENV === "development";
+
+const cspDirectives = {
+  defaultSrc: ["'self'"],
+  styleSrc: [
+    "'self'",
+    "'unsafe-inline'", // allow Tailwind/preflight style tags
+    "https://fonts.googleapis.com",
+  ],
+  styleSrcElem: [
+    "'self'",
+    "'unsafe-inline'",
+    "https://fonts.googleapis.com",
+  ],
+  scriptSrc: [
+    "'self'",
+    // Relaxed in development to keep Vite/React refresh working
+    ...(isDevelopment ? ["'unsafe-inline'", "'unsafe-eval'"] : []),
+  ],
+  scriptSrcElem: [
+    "'self'",
+    ...(isDevelopment ? ["'unsafe-inline'", "'unsafe-eval'"] : []),
+  ],
+  imgSrc: ["'self'", "data:", "https:"], // Allow images from any HTTPS source
+  connectSrc: [
+    "'self'",
+    // Enable dev tooling (Vite HMR, PostHog dev proxies, etc.)
+    ...(isDevelopment ? ["ws://localhost:*", "http://localhost:*"] : []),
+  ],
+  fontSrc: ["'self'", "data:", "https://fonts.gstatic.com"],
+  objectSrc: ["'none'"],
+  mediaSrc: ["'self'"],
+  frameSrc: ["'none'"],
+};
 
 // Security headers using Helmet
 export function setupSecurityHeaders(app: Express) {
   app.use(
     helmet({
       contentSecurityPolicy: {
-        directives: {
-          defaultSrc: ["'self'"],
-          styleSrc: ["'self'", "'unsafe-inline'"], // Needed for inline styles
-          scriptSrc: ["'self'"],
-          imgSrc: ["'self'", "data:", "https:"], // Allow images from any HTTPS source
-          connectSrc: ["'self'"],
-          fontSrc: ["'self'", "data:"],
-          objectSrc: ["'none'"],
-          mediaSrc: ["'self'"],
-          frameSrc: ["'none'"],
-        },
+        directives: cspDirectives,
       },
       crossOriginEmbedderPolicy: false, // Disable for compatibility
       crossOriginResourcePolicy: { policy: "cross-origin" },
