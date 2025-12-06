@@ -1,5 +1,6 @@
 import type { Server } from "http";
 import { pool } from "./db";
+import { logger } from "./logger";
 
 /**
  * Setup graceful shutdown handlers for the HTTP server
@@ -7,28 +8,28 @@ import { pool } from "./db";
  */
 export function setupGracefulShutdown(httpServer: Server) {
   const shutdown = async (signal: string) => {
-    console.log(`\n${signal} received. Starting graceful shutdown...`);
+    logger.info({ signal }, "Starting graceful shutdown");
     
     // Stop accepting new connections
     httpServer.close(async () => {
-      console.log("HTTP server closed");
+      logger.info("HTTP server closed");
       
       try {
         // Close database connections
         await pool.end();
-        console.log("Database connections closed");
+        logger.info("Database connections closed");
         
-        console.log("Graceful shutdown completed");
+        logger.info("Graceful shutdown completed");
         process.exit(0);
       } catch (error) {
-        console.error("Error during graceful shutdown:", error);
+        logger.error({ err: error }, "Error during graceful shutdown");
         process.exit(1);
       }
     });
     
     // Force shutdown after 30 seconds
     setTimeout(() => {
-      console.error("Forceful shutdown after timeout");
+      logger.error("Forceful shutdown after timeout");
       process.exit(1);
     }, 30000);
   };
@@ -39,12 +40,12 @@ export function setupGracefulShutdown(httpServer: Server) {
   
   // Handle uncaught errors
   process.on("uncaughtException", (error) => {
-    console.error("Uncaught Exception:", error);
+    logger.error({ err: error }, "Uncaught Exception");
     shutdown("UNCAUGHT_EXCEPTION");
   });
   
   process.on("unhandledRejection", (reason, promise) => {
-    console.error("Unhandled Rejection at:", promise, "reason:", reason);
+    logger.error({ promise, reason }, "Unhandled Rejection");
     shutdown("UNHANDLED_REJECTION");
   });
 }
