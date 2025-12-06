@@ -28,7 +28,6 @@ export function getSession() {
 
   const sessionStore = new pgStore({
     conString: env.DATABASE_URL,
-    // ✅ خليها true عشان ينشئ جدول sessions لو مش موجود
     createTableIfMissing: true,
     ttl: sessionTtl,
     tableName: "sessions",
@@ -40,15 +39,15 @@ export function getSession() {
     resave: false,
     saveUninitialized: false,
     proxy: true,
-    name: "sessionId", // Don't use default 'connect.sid'
+    name: "sessionId",
     cookie: {
-      httpOnly: true, // Prevent XSS attacks
-      secure: env.SESSION_COOKIE_SECURE, // HTTPS only in production or if forced
-      sameSite: "lax", // CSRF protection
+      httpOnly: true,
+      secure: env.SESSION_COOKIE_SECURE,
+      sameSite: "lax",
       maxAge: sessionTtl,
-      domain: env.COOKIE_DOMAIN || undefined, // Set domain if needed
+      domain: env.COOKIE_DOMAIN || undefined,
     },
-    rolling: true, // Reset expiration on activity
+    rolling: true,
   });
 }
 
@@ -70,20 +69,19 @@ export async function setupAuth(app: Express) {
           }
 
           if (!user.password) {
-            return done(null, false, { message: "يرجى إعادة تعيين كلمة المرور" });
+            return done(null, false, { message: "الحساب لا يدعم تسجيل الدخول بكلمة مرور" });
           }
 
           // Add small delay to prevent timing attacks
           const isValid = await bcrypt.compare(password, user.password);
           if (!isValid) {
-            // Add delay even on failure to prevent timing attacks
             await new Promise(resolve => setTimeout(resolve, 100));
             return done(null, false, { message: "كلمة المرور غير صحيحة" });
           }
 
           return done(null, user);
         } catch (error) {
-          console.error("LocalStrategy error:", error); // 👈 يساعد في الـ Logs
+          logger.error({ err: error }, "LocalStrategy error");
           return done(error);
         }
       }
@@ -101,7 +99,6 @@ export async function setupAuth(app: Express) {
     const email = params.email ?? undefined;
 
     if (!email) {
-      // بدون بريد لا نستطيع ربط الحساب بمستخدم
       throw new Error("No email returned from OAuth provider");
     }
 
@@ -136,8 +133,7 @@ export async function setupAuth(app: Express) {
             const email = profile.emails?.[0]?.value || null;
             const firstName = profile.name?.givenName || null;
             const lastName = profile.name?.familyName || null;
-            const avatar =
-              (profile.photos && profile.photos[0]?.value) || null;
+            const avatar = (profile.photos && profile.photos[0]?.value) || null;
 
             const user = await findOrCreateOAuthUser({
               email,
@@ -167,8 +163,7 @@ export async function setupAuth(app: Express) {
       passport.authenticate("google", {
         failureRedirect: "/login",
       }),
-      (req, res) => {
-        // نجاح: أعد التوجيه للواجهة الرئيسية
+      (_req, res) => {
         res.redirect("/");
       },
     );
@@ -191,13 +186,11 @@ export async function setupAuth(app: Express) {
           done: (err: any, user?: any) => void,
         ) => {
           try {
-            const primaryEmail =
-              (profile.emails && profile.emails[0]?.value) || null;
+            const primaryEmail = (profile.emails && profile.emails[0]?.value) || null;
             const displayName = profile.displayName || profile.username || "";
             const [firstName, ...rest] = displayName.split(" ");
             const lastName = rest.join(" ") || null;
-            const avatar =
-              (profile.photos && profile.photos[0]?.value) || null;
+            const avatar = (profile.photos && profile.photos[0]?.value) || null;
 
             const user = await findOrCreateOAuthUser({
               email: primaryEmail,
@@ -222,7 +215,7 @@ export async function setupAuth(app: Express) {
       passport.authenticate("github", {
         failureRedirect: "/login",
       }),
-      (req, res) => {
+      (_req, res) => {
         res.redirect("/");
       },
     );
@@ -235,9 +228,7 @@ export async function setupAuth(app: Express) {
         {
           clientID: env.MS_CLIENT_ID,
           clientSecret: env.MS_CLIENT_SECRET,
-          callbackURL:
-            env.MS_CALLBACK_URL ||
-            "/api/auth/microsoft/callback",
+          callbackURL: env.MS_CALLBACK_URL || "/api/auth/microsoft/callback",
           scope: ["user.read"],
           tenant: "common",
         },
@@ -253,12 +244,9 @@ export async function setupAuth(app: Express) {
               profile._json?.mail ||
               profile._json?.userPrincipalName ||
               null;
-            const firstName =
-              profile.name?.givenName || profile._json?.givenName || null;
-            const lastName =
-              profile.name?.familyName || profile._json?.surname || null;
-            const avatar =
-              (profile.photos && profile.photos[0]?.value) || null;
+            const firstName = profile.name?.givenName || profile._json?.givenName || null;
+            const lastName = profile.name?.familyName || profile._json?.surname || null;
+            const avatar = (profile.photos && profile.photos[0]?.value) || null;
 
             const user = await findOrCreateOAuthUser({
               email,
@@ -279,7 +267,6 @@ export async function setupAuth(app: Express) {
     app.get(
       "/api/auth/microsoft",
       passport.authenticate("microsoft", {
-        // تطلب صلاحية قراءة بيانات المستخدم الأساسية
         prompt: "select_account",
       }),
     );
@@ -289,18 +276,16 @@ export async function setupAuth(app: Express) {
       passport.authenticate("microsoft", {
         failureRedirect: "/login",
       }),
-      (req, res) => {
+      (_req, res) => {
         res.redirect("/");
       },
     );
   }
 
-  // نخزّن فقط id في الـ session
   passport.serializeUser((user: any, done) => {
     done(null, user.id);
   });
 
-  // نسترجع المستخدم الكامل من الـ DB
   passport.deserializeUser(async (id: string, done) => {
     try {
       const user = await storage.getUser(id);
@@ -314,18 +299,16 @@ export async function setupAuth(app: Express) {
     try {
       let { email, password, firstName, lastName } = req.body;
 
-      // Validate and sanitize input
       if (!email || !password) {
-        return res.status(400).json({ message: "البريد الإلكتروني وكلمة المرور مطلوبان" });
+        return res.status(400).json({ message: "البريد الإلكتروني وكلمة المرور مطلوبة" });
       }
 
       email = sanitizeInput(email.toLowerCase().trim());
-      
+
       if (!isValidEmail(email)) {
-        return res.status(400).json({ message: "البريد الإلكتروني غير صالح" });
+        return res.status(400).json({ message: "صيغة البريد الإلكتروني غير صحيحة" });
       }
 
-      // Validate password strength
       const passwordValidation = validatePasswordStrength(password);
       if (!passwordValidation.valid) {
         return res.status(400).json({ message: passwordValidation.message });
@@ -336,10 +319,10 @@ export async function setupAuth(app: Express) {
 
       const existingUser = await storage.getUserByEmail(email);
       if (existingUser) {
-        return res.status(400).json({ message: "البريد الإلكتروني مستخدم بالفعل" });
+        return res.status(400).json({ message: "البريد الإلكتروني مسجل مسبقاً" });
       }
 
-      const hashedPassword = await bcrypt.hash(password, 12); // Increased rounds for better security
+      const hashedPassword = await bcrypt.hash(password, 12);
       const usersCount = await storage.getUsersCount();
 
       const user = await storage.createUser({
@@ -352,33 +335,33 @@ export async function setupAuth(app: Express) {
 
       req.login(user, (err) => {
         if (err) {
-          console.error("Login after register error:", err);
-          return res.status(500).json({ message: "خطأ في تسجيل الدخول" });
+          logger.error({ err }, "Login after register error");
+          return res.status(500).json({ message: "حدث خطأ أثناء تسجيل الدخول" });
         }
         const { password: _, ...userWithoutPassword } = user;
         return res.status(201).json(userWithoutPassword);
       });
     } catch (error) {
-      console.error("Registration error:", error);
-      res.status(500).json({ message: "حدث خطأ في التسجيل" });
+      logger.error({ err: error }, "Registration error");
+      res.status(500).json({ message: "حدث خطأ غير متوقع أثناء التسجيل" });
     }
   });
 
   app.post("/api/auth/login", authRateLimiter, (req, res, next) => {
     passport.authenticate("local", (err: any, user: any, info: any) => {
       if (err) {
-        console.error("Login strategy error:", err); // 👈 يوضح السبب في الـ Logs
-        return res.status(500).json({ message: "خطأ في الخادم" });
+        logger.error({ err }, "Login strategy error");
+        return res.status(500).json({ message: "حدث خطأ أثناء تسجيل الدخول" });
       }
       if (!user) {
         return res
           .status(401)
-          .json({ message: info?.message || "فشل تسجيل الدخول" });
+          .json({ message: info?.message || "بيانات الدخول غير صحيحة" });
       }
-      req.login(user, (err) => {
-        if (err) {
-          console.error("Session save error:", err); // 👈 لو المشكلة من sessions
-          return res.status(500).json({ message: "خطأ في تسجيل الدخول" });
+      req.login(user, (loginErr) => {
+        if (loginErr) {
+          logger.error({ err: loginErr }, "Session save error");
+          return res.status(500).json({ message: "حدث خطأ أثناء حفظ الجلسة" });
         }
         const { password: _, ...userWithoutPassword } = user;
         return res.json(userWithoutPassword);
@@ -389,7 +372,7 @@ export async function setupAuth(app: Express) {
   app.post("/api/auth/logout", (req, res) => {
     req.logout((err) => {
       if (err) {
-        return res.status(500).json({ message: "خطأ في تسجيل الخروج" });
+        return res.status(500).json({ message: "حدث خطأ أثناء تسجيل الخروج" });
       }
       res.json({ message: "تم تسجيل الخروج بنجاح" });
     });
@@ -404,7 +387,6 @@ export async function setupAuth(app: Express) {
         const { id } = req.params;
         const { password } = req.body;
 
-        // Validate password strength
         const passwordValidation = validatePasswordStrength(password);
         if (!passwordValidation.valid) {
           return res.status(400).json({ message: passwordValidation.message });
@@ -419,18 +401,19 @@ export async function setupAuth(app: Express) {
         const updatedUser = await storage.updateUserPassword(id, hashedPassword);
 
         if (!updatedUser) {
-          return res.status(500).json({ message: "فشل في تحديث كلمة المرور" });
+          return res.status(500).json({ message: "تعذر تحديث كلمة المرور" });
         }
 
-        console.log(
-          `Admin ${(req.user as any)?.email} reset password for user ${user.email}`
+        logger.info(
+          { admin: (req.user as any)?.email, userEmail: user.email },
+          "Admin reset password for user"
         );
 
         const { password: _, ...userWithoutPassword } = updatedUser;
         res.json(userWithoutPassword);
       } catch (error) {
-        console.error("Password reset error:", error);
-        res.status(500).json({ message: "حدث خطأ في تحديث كلمة المرور" });
+        logger.error({ err: error }, "Password reset error");
+        res.status(500).json({ message: "حدث خطأ غير متوقع أثناء إعادة التعيين" });
       }
     }
   );
