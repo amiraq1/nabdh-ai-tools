@@ -4,11 +4,9 @@ import * as schema from "@shared/schema";
 import { env } from "./config";
 
 const ssl =
-  env.NODE_ENV === "production"
-    ? { rejectUnauthorized: env.DB_SSL_REJECT_UNAUTHORIZED ?? true }
-    : env.DB_SSL_REJECT_UNAUTHORIZED !== undefined
-      ? { rejectUnauthorized: env.DB_SSL_REJECT_UNAUTHORIZED }
-      : undefined;
+  env.DB_SSL_REQUIRED === true
+    ? { rejectUnauthorized: true }
+    : undefined;
 
 export const pool = new Pool({
   connectionString: env.DATABASE_URL,
