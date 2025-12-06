@@ -1,7 +1,7 @@
-import type { Express } from "express";
-import { createServer, type Server } from "http";
+import type { Express, Request, Response } from "express";
+import { type Server } from "http";
 import { storage } from "./storage";
-import { insertSupplierSchema, insertTransactionSchema } from "@shared/schema";
+import { insertSupplierSchema, insertTransactionSchema, userRoles, type UserRole } from "@shared/schema";
 import { z } from "zod";
 import { setupAuth, isAuthenticated, requireRole } from "./auth";
 import { apiRateLimiter } from "./security";
@@ -13,31 +13,49 @@ import {
   checkGoogleDriveConnection 
 } from "./googleDrive";
 
+const buildHealthPayload = () => ({
+  status: "ok",
+  timestamp: new Date().toISOString(),
+  uptime: process.uptime(),
+});
+
+const sendHealth = (_req: Request, res: Response) => {
+  res.status(200).json(buildHealthPayload());
+};
+
+const parsePaginationParams = (query: Request["query"]) => {
+  const parsePositiveInt = (value: unknown, fallback: number, max?: number) => {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric) || numeric <= 0) return fallback;
+    const safeValue = Math.floor(numeric);
+    return max ? Math.min(safeValue, max) : safeValue;
+  };
+
+  return {
+    page: parsePositiveInt(query.page, 1),
+    limit: parsePositiveInt(query.limit, 20, 100),
+  };
+};
+
+const isValidRole = (role: unknown): role is UserRole =>
+  typeof role === "string" && (userRoles as readonly string[]).includes(role);
+
+const adminOnly: UserRole[] = ["admin"];
+const editorOrAdmin: UserRole[] = ["admin", "editor"];
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
   
   // Health check endpoint for Railway and monitoring
-  app.get("/health", (_req, res) => {
-    res.status(200).json({ 
-      status: "ok", 
-      timestamp: new Date().toISOString(),
-      uptime: process.uptime()
-    });
-  });
+  app.get("/health", sendHealth);
 
-  app.get("/api/health", (_req, res) => {
-    res.status(200).json({ 
-      status: "ok", 
-      timestamp: new Date().toISOString(),
-      uptime: process.uptime()
-    });
-  });
+  app.get("/api/health", sendHealth);
   
   await setupAuth(app);
 
-  app.get("/api/auth/user", async (req: any, res) => {
+  app.get("/api/auth/user", async (req: Request, res: Response) => {
     try {
       if (!req.isAuthenticated() || !req.user?.id) {
         return res.status(401).json({ message: "Unauthorized" });
@@ -56,10 +74,9 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/users", apiRateLimiter, isAuthenticated, requireRole(["admin"]), async (req, res) => {
+  app.get("/api/users", apiRateLimiter, isAuthenticated, requireRole(adminOnly), async (req: Request, res) => {
     try {
-      const page = Math.max(1, parseInt(req.query.page as string) || 1);
-      const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 20));
+      const { page, limit } = parsePaginationParams(req.query);
       const result = await storage.getUsers(page, limit);
       res.json(result);
     } catch (error) {
@@ -67,10 +84,10 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/users/:id/role", isAuthenticated, requireRole(["admin"]), async (req: any, res) => {
+  app.patch("/api/users/:id/role", isAuthenticated, requireRole(adminOnly), async (req: Request<{ id: string }, unknown, { role?: UserRole }>, res) => {
     try {
       const { role } = req.body;
-      if (!["admin", "editor", "viewer"].includes(role)) {
+      if (!isValidRole(role)) {
         return res.status(400).json({ error: "Invalid role" });
       }
       
@@ -110,7 +127,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/suppliers", isAuthenticated, requireRole(["admin", "editor"]), async (req, res) => {
+  app.post("/api/suppliers", isAuthenticated, requireRole(editorOrAdmin), async (req, res) => {
     try {
       const validatedData = insertSupplierSchema.parse(req.body);
       const supplier = await storage.createSupplier(validatedData);
@@ -123,7 +140,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/suppliers/:id", isAuthenticated, requireRole(["admin", "editor"]), async (req, res) => {
+  app.patch("/api/suppliers/:id", isAuthenticated, requireRole(editorOrAdmin), async (req, res) => {
     try {
       const validatedData = insertSupplierSchema.partial().parse(req.body);
       const supplier = await storage.updateSupplier(req.params.id, validatedData);
@@ -139,7 +156,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/suppliers/:id", isAuthenticated, requireRole(["admin"]), async (req, res) => {
+  app.delete("/api/suppliers/:id", isAuthenticated, requireRole(adminOnly), async (req, res) => {
     try {
       await storage.deleteTransactionsBySupplier(req.params.id);
       const deleted = await storage.deleteSupplier(req.params.id);
@@ -182,7 +199,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/transactions", isAuthenticated, requireRole(["admin", "editor"]), async (req, res) => {
+  app.post("/api/transactions", isAuthenticated, requireRole(editorOrAdmin), async (req, res) => {
     try {
       const validatedData = insertTransactionSchema.parse(req.body);
       
@@ -201,7 +218,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/transactions/:id", isAuthenticated, requireRole(["admin"]), async (req, res) => {
+  app.delete("/api/transactions/:id", isAuthenticated, requireRole(adminOnly), async (req, res) => {
     try {
       const deleted = await storage.deleteTransaction(req.params.id);
       if (!deleted) {

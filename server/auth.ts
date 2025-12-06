@@ -14,6 +14,7 @@ import type { Express, RequestHandler } from "express";
 import connectPg from "connect-pg-simple";
 import bcrypt from "bcrypt";
 import { storage } from "./storage";
+import type { UserRole } from "@shared/schema";
 import { authRateLimiter, validatePasswordStrength, isValidEmail, sanitizeInput } from "./security";
 import { env } from "./config";
 
@@ -439,7 +440,7 @@ export const isAuthenticated: RequestHandler = (req, res, next) => {
   return res.status(401).json({ message: "Unauthorized" });
 };
 
-export const requireRole = (roles: string[]): RequestHandler => {
+export const requireRole = (roles: UserRole[]): RequestHandler => {
   return async (req, res, next) => {
     const user = req.user as any;
     if (!user?.id) {
