@@ -93,14 +93,14 @@ export class DatabaseStorage implements IStorage {
 
   async getUsersCount(): Promise<number> {
     const [result] = await db.select({ count: count() }).from(users);
-    return result?.count || 0;
+    return Number(result?.count ?? 0);
   }
 
   async getUsers(page: number = 1, limit: number = 20): Promise<{ users: User[]; total: number; page: number; limit: number; totalPages: number }> {
     const offset = (page - 1) * limit;
     
     const [countResult] = await db.select({ total: count() }).from(users);
-    const total = countResult?.total || 0;
+    const total = Number(countResult?.total ?? 0);
     
     const usersList = await db
       .select()
