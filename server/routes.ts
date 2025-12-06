@@ -5,6 +5,7 @@ import { insertSupplierSchema, insertTransactionSchema, userRoles, type UserRole
 import { z } from "zod";
 import { setupAuth, isAuthenticated, requireRole } from "./auth";
 import { apiRateLimiter } from "./security";
+import { logger } from "./logger";
 import { 
   uploadBackupToGoogleDrive, 
   listBackups, 
@@ -69,7 +70,7 @@ export async function registerRoutes(
         res.status(404).json({ message: "User not found" });
       }
     } catch (error) {
-      console.error("Error fetching user:", error);
+      logger.error({ err: error }, "Error fetching user");
       res.status(500).json({ message: "Failed to fetch user" });
     }
   });
@@ -270,7 +271,7 @@ export async function registerRoutes(
       
       res.json(result);
     } catch (error) {
-      console.error("Backup error:", error);
+      logger.error({ err: error }, "Backup error");
       res.status(500).json({ error: "Failed to create backup" });
     }
   });
