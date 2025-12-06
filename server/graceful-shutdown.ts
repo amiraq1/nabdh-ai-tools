@@ -6,18 +6,30 @@ import { pool } from "./db";
  * This ensures connections are closed properly when the app is terminated
  */
 export function setupGracefulShutdown(httpServer: Server) {
+  let isShuttingDown = false;
+  let shutdownTimer: NodeJS.Timeout | undefined;
+
   const shutdown = async (signal: string) => {
+    if (isShuttingDown) {
+      console.log(`${signal} received but shutdown already in progress`);
+      return;
+    }
+    isShuttingDown = true;
     console.log(`\n${signal} received. Starting graceful shutdown...`);
     
     // Stop accepting new connections
     httpServer.close(async () => {
       console.log("HTTP server closed");
-      
+
       try {
         // Close database connections
         await pool.end();
         console.log("Database connections closed");
-        
+
+        if (shutdownTimer) {
+          clearTimeout(shutdownTimer);
+        }
+
         console.log("Graceful shutdown completed");
         process.exit(0);
       } catch (error) {
@@ -27,7 +39,7 @@ export function setupGracefulShutdown(httpServer: Server) {
     });
     
     // Force shutdown after 30 seconds
-    setTimeout(() => {
+    shutdownTimer = setTimeout(() => {
       console.error("Forceful shutdown after timeout");
       process.exit(1);
     }, 30000);
