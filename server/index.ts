@@ -11,7 +11,6 @@ import { httpLogger, logger } from "./logger";
 
 const app = express();
 const httpServer = createServer(app);
-const isProduction = process.env.NODE_ENV === "production";
 
 declare module "http" {
   interface IncomingMessage {
