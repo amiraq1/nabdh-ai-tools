@@ -22,7 +22,7 @@ async function throwIfResNotOk(res: Response) {
 }
 
 // Extract clean error message by removing status code prefix
-export function extractErrorMessage(error: Error | any): string {
+export function extractErrorMessage(error: Error | { message?: string }): string {
   const message = error?.message || "";
   // Remove status code prefix (e.g., "401: message" -> "message")
   return message.replace(/^\d+:\s*/, "");
