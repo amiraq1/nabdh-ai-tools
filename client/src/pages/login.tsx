@@ -74,9 +74,11 @@ export default function Login() {
       navigate("/");
     },
     onError: (error: any) => {
+      // Extract the message after the status code (e.g., "401: message" -> "message")
+      const errorMessage = error.message?.replace(/^\d+:\s*/, "") || "تحقق من بياناتك وحاول مرة أخرى";
       toast({
         title: "فشل تسجيل الدخول",
-        description: error.message || "تحقق من بياناتك وحاول مرة أخرى",
+        description: errorMessage,
         variant: "destructive",
       });
     },
@@ -101,9 +103,11 @@ export default function Login() {
       navigate("/");
     },
     onError: (error: any) => {
+      // Extract the message after the status code (e.g., "400: message" -> "message")
+      const errorMessage = error.message?.replace(/^\d+:\s*/, "") || "تحقق من بياناتك وحاول مرة أخرى";
       toast({
         title: "فشل إنشاء الحساب",
-        description: error.message || "تحقق من بياناتك وحاول مرة أخرى",
+        description: errorMessage,
         variant: "destructive",
       });
     },
