@@ -315,46 +315,6 @@ export default function Login() {
             )}
           </CardContent>
           <CardFooter className="flex flex-col gap-4">
-            <div className="flex flex-col gap-2">
-              <div className="text-center text-xs text-muted-foreground">
-                أو سجّل الدخول بواسطة
-              </div>
-              <div className="grid grid-cols-1 gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => {
-                    window.location.href = "/api/auth/google";
-                  }}
-                  data-testid="button-login-google"
-                >
-                  تسجيل الدخول بواسطة Google
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => {
-                    window.location.href = "/api/auth/github";
-                  }}
-                  data-testid="button-login-github"
-                >
-                  تسجيل الدخول بواسطة GitHub
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => {
-                    window.location.href = "/api/auth/microsoft";
-                  }}
-                  data-testid="button-login-microsoft"
-                >
-                  تسجيل الدخول بواسطة Microsoft
-                </Button>
-              </div>
-            </div>
             <div className="text-center text-sm text-muted-foreground">
               {isRegister ? (
                 <>
