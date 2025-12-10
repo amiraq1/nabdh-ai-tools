@@ -33,7 +33,7 @@ import {
   Line
 } from "recharts";
 import { supplierCategories } from "@shared/schema";
-import { numberToArabicWords } from "@/lib/export-utils";
+import { numberToArabicWords } from "@/lib/arabic-numbers";
 
 function StatCard({ 
   title, 

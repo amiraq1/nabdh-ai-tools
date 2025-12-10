@@ -39,10 +39,15 @@ export default defineConfig({
           'react-vendor': ['react', 'react-dom', 'react-router'],
           'ui-vendor': ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', '@radix-ui/react-select'],
           'query-vendor': ['@tanstack/react-query'],
+          // Heavy libraries - loaded on demand
+          'xlsx': ['xlsx'],
+          'pdfmake': ['pdfmake'],
+          'recharts': ['recharts'],
+          'zod': ['zod'],
         },
       },
     },
-    chunkSizeWarningLimit: 1000, // Warn if chunk exceeds 1MB
+    chunkSizeWarningLimit: 500, // Warn if chunk exceeds 500KB
   },
   server: {
     fs: {

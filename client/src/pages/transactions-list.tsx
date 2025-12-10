@@ -45,8 +45,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { exportTransactionsToExcel, exportTransactionsToPDF } from "@/lib/export-utils";
 import { useQuery } from "@tanstack/react-query";
+
+// Lazy load export utils for better performance
+const loadExportUtils = () => import("@/lib/export-utils");
 import { Link } from "wouter";
 import { queryClient } from "@/lib/queryClient";
 import type { Supplier, Transaction } from "@shared/schema";
@@ -155,14 +157,20 @@ export default function TransactionsList() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem 
-                onClick={() => exportTransactionsToExcel(transactions, suppliers)}
+                onClick={async () => {
+                  const { exportTransactionsToExcel } = await loadExportUtils();
+                  exportTransactionsToExcel(transactions, suppliers);
+                }}
                 data-testid="button-export-transactions-excel"
               >
                 <FileSpreadsheet className="h-4 w-4 ml-2" />
                 تصدير Excel
               </DropdownMenuItem>
               <DropdownMenuItem 
-                onClick={() => exportTransactionsToPDF(transactions, suppliers)}
+                onClick={async () => {
+                  const { exportTransactionsToPDF } = await loadExportUtils();
+                  exportTransactionsToPDF(transactions, suppliers);
+                }}
                 data-testid="button-export-transactions-pdf"
               >
                 <FileText className="h-4 w-4 ml-2" />
