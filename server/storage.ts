@@ -6,6 +6,13 @@ export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  upsertUser(user: {
+    id: string;
+    email?: string | null;
+    firstName?: string | null;
+    lastName?: string | null;
+    profileImageUrl?: string | null;
+  }): Promise<User>;
   getUsersCount(): Promise<number>;
   getUsers(page?: number, limit?: number): Promise<{ users: User[]; total: number; page: number; limit: number; totalPages: number }>;
   updateUserRole(id: string, role: string): Promise<User | undefined>;
@@ -44,16 +51,56 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
+  async upsertUser(userData: {
+    id: string;
+    email?: string | null;
+    firstName?: string | null;
+    lastName?: string | null;
+    profileImageUrl?: string | null;
+  }): Promise<User> {
+    const existing = await this.getUser(userData.id);
+
+    if (existing) {
+      const [user] = await db
+        .update(users)
+        .set({
+          email: userData.email ?? existing.email,
+          firstName: userData.firstName ?? existing.firstName,
+          lastName: userData.lastName ?? existing.lastName,
+          profileImageUrl: userData.profileImageUrl ?? existing.profileImageUrl,
+          updatedAt: new Date(),
+        })
+        .where(eq(users.id, userData.id))
+        .returning();
+
+      return user;
+    }
+
+    const [user] = await db
+      .insert(users)
+      .values({
+        id: userData.id,
+        email: userData.email ?? null,
+        firstName: userData.firstName ?? null,
+        lastName: userData.lastName ?? null,
+        profileImageUrl: userData.profileImageUrl ?? null,
+        role: "viewer",
+      })
+      .returning();
+
+    return user;
+  }
+
   async getUsersCount(): Promise<number> {
     const [result] = await db.select({ count: count() }).from(users);
-    return result?.count || 0;
+    return Number(result?.count ?? 0);
   }
 
   async getUsers(page: number = 1, limit: number = 20): Promise<{ users: User[]; total: number; page: number; limit: number; totalPages: number }> {
     const offset = (page - 1) * limit;
     
     const [countResult] = await db.select({ total: count() }).from(users);
-    const total = countResult?.total || 0;
+    const total = Number(countResult?.total ?? 0);
     
     const usersList = await db
       .select()

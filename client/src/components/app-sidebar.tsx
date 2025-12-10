@@ -3,7 +3,7 @@ import {
   Users, 
   Receipt, 
   PlusCircle,
-  Building2,
+  Heart,
   Shield,
   CloudUpload
 } from "lucide-react";
@@ -67,11 +67,11 @@ export function AppSidebar() {
       <SidebarHeader className="border-b border-sidebar-border p-4">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary text-primary-foreground">
-            <Building2 className="h-5 w-5" />
+            <Heart className="h-5 w-5 fill-current" />
           </div>
           <div className="flex flex-col group-data-[collapsible=icon]:hidden">
-            <span className="font-semibold text-base">إدارة الموردين</span>
-            <span className="text-xs text-muted-foreground">نظام الأرصدة</span>
+            <span className="font-semibold text-base">نبض</span>
+            <span className="text-xs text-muted-foreground">نظام إدارة الموردين</span>
           </div>
         </div>
       </SidebarHeader>
@@ -130,7 +130,7 @@ export function AppSidebar() {
       </SidebarContent>
       <SidebarFooter className="border-t border-sidebar-border p-4 group-data-[collapsible=icon]:hidden">
         <div className="text-xs text-muted-foreground text-center">
-          نظام إدارة الموردين v1.0
+          نبض v1.0
         </div>
       </SidebarFooter>
     </Sidebar>

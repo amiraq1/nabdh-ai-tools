@@ -8,20 +8,22 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { TrendingUp, Loader2, Eye, EyeOff } from "lucide-react";
-import { FcGoogle } from "react-icons/fc";
+import { Heart, Loader2, Eye, EyeOff } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
 const loginSchema = z.object({
   email: z.string().email("البريد الإلكتروني غير صالح"),
-  password: z.string().min(6, "كلمة المرور يجب أن تكون 6 أحرف على الأقل"),
+  password: z.string().min(1, "كلمة المرور مطلوبة"),
 });
 
 const registerSchema = z.object({
   email: z.string().email("البريد الإلكتروني غير صالح"),
-  password: z.string().min(6, "كلمة المرور يجب أن تكون 6 أحرف على الأقل"),
-  confirmPassword: z.string().min(6, "كلمة المرور يجب أن تكون 6 أحرف على الأقل"),
+  password: z.string()
+    .min(8, "كلمة المرور يجب أن تكون 8 أحرف على الأقل")
+    .regex(/[a-zA-Zأ-ي]/, "كلمة المرور يجب أن تحتوي على حروف")
+    .regex(/[0-9]/, "كلمة المرور يجب أن تحتوي على رقم واحد على الأقل"),
+  confirmPassword: z.string().min(8, "كلمة المرور يجب أن تكون 8 أحرف على الأقل"),
   firstName: z.string().optional(),
   lastName: z.string().optional(),
 }).refine((data) => data.password === data.confirmPassword, {
@@ -67,9 +69,9 @@ export default function Login() {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       toast({
         title: "تم تسجيل الدخول بنجاح",
-        description: "مرحباً بك في نظام إدارة الموردين",
+        description: "مرحباً بك في نبض",
       });
-      navigate("/dashboard");
+      navigate("/");
     },
     onError: (error: any) => {
       toast({
@@ -94,9 +96,9 @@ export default function Login() {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       toast({
         title: "تم إنشاء الحساب بنجاح",
-        description: "مرحباً بك في نظام إدارة الموردين",
+        description: "مرحباً بك في نبض",
       });
-      navigate("/dashboard");
+      navigate("/");
     },
     onError: (error: any) => {
       toast({
@@ -122,9 +124,9 @@ export default function Login() {
           <Link href="/">
             <div className="flex items-center gap-2 cursor-pointer">
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                <TrendingUp className="h-5 w-5" />
+                <Heart className="h-5 w-5 fill-current" />
               </div>
-              <span className="text-xl font-bold">نظام إدارة الموردين</span>
+              <span className="text-xl font-bold">نبض</span>
             </div>
           </Link>
           <ThemeToggle />
@@ -311,31 +313,48 @@ export default function Login() {
                 </Button>
               </form>
             )}
-            {isRegister ? null : (
-              <>
-                <div className="relative mt-4">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-card px-2 text-muted-foreground">
-                    أو
-                  </span>
-                </div>
-              </div>
-              <Button 
-                variant="outline" 
-                className="w-full" 
-                onClick={() => window.location.href = "/api/auth/google"}
-                data-testid="button-google-login"
-              >
-                <FcGoogle className="h-5 w-5 ml-2" />
-                تسجيل الدخول عبر Google
-              </Button>
-              </>
-            )}
           </CardContent>
           <CardFooter className="flex flex-col gap-4">
+            <div className="flex flex-col gap-2">
+              <div className="text-center text-xs text-muted-foreground">
+                أو سجّل الدخول بواسطة
+              </div>
+              <div className="grid grid-cols-1 gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => {
+                    window.location.href = "/api/auth/google";
+                  }}
+                  data-testid="button-login-google"
+                >
+                  تسجيل الدخول بواسطة Google
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => {
+                    window.location.href = "/api/auth/github";
+                  }}
+                  data-testid="button-login-github"
+                >
+                  تسجيل الدخول بواسطة GitHub
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => {
+                    window.location.href = "/api/auth/microsoft";
+                  }}
+                  data-testid="button-login-microsoft"
+                >
+                  تسجيل الدخول بواسطة Microsoft
+                </Button>
+              </div>
+            </div>
             <div className="text-center text-sm text-muted-foreground">
               {isRegister ? (
                 <>
@@ -369,11 +388,9 @@ export default function Login() {
 
       <footer className="border-t py-4 px-4">
         <div className="container mx-auto text-center text-sm text-muted-foreground">
-          نظام إدارة الموردين والأرصدة
+          نبض - نظام إدارة الموردين والأرصدة
         </div>
       </footer>
     </div>
   );
 }
-
-

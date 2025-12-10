@@ -13,17 +13,24 @@ export const sessions = pgTable(
   (table) => [index("IDX_session_expire").on(table.expire)],
 );
 
-export const users = pgTable("users", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  email: varchar("email").unique(),
-  password: varchar("password"),
-  firstName: varchar("first_name"),
-  lastName: varchar("last_name"),
-  profileImageUrl: varchar("profile_image_url"),
-  role: varchar("role").notNull().default("viewer"),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
+export const users = pgTable(
+  "users",
+  {
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+    email: varchar("email").unique(),
+    password: varchar("password"),
+    firstName: varchar("first_name"),
+    lastName: varchar("last_name"),
+    profileImageUrl: varchar("profile_image_url"),
+    role: varchar("role").notNull().default("viewer"),
+    createdAt: timestamp("created_at").defaultNow(),
+    updatedAt: timestamp("updated_at").defaultNow(),
+  },
+  (table) => [
+    index("IDX_users_email").on(table.email),
+    index("IDX_users_role").on(table.role),
+  ]
+);
 
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -37,16 +44,23 @@ export type User = typeof users.$inferSelect;
 export const userRoles = ["admin", "editor", "viewer"] as const;
 export type UserRole = typeof userRoles[number];
 
-export const suppliers = pgTable("suppliers", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  name: text("name").notNull(),
-  phone: text("phone"),
-  email: text("email"),
-  address: text("address"),
-  category: text("category").notNull(),
-  notes: text("notes"),
-  balance: real("balance").notNull().default(0),
-});
+export const suppliers = pgTable(
+  "suppliers",
+  {
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+    name: text("name").notNull(),
+    phone: text("phone"),
+    email: text("email"),
+    address: text("address"),
+    category: text("category").notNull(),
+    notes: text("notes"),
+    balance: real("balance").notNull().default(0),
+  },
+  (table) => [
+    index("IDX_suppliers_category").on(table.category),
+    index("IDX_suppliers_name").on(table.name),
+  ]
+);
 
 export const insertSupplierSchema = createInsertSchema(suppliers).omit({
   id: true,
@@ -55,14 +69,22 @@ export const insertSupplierSchema = createInsertSchema(suppliers).omit({
 export type InsertSupplier = z.infer<typeof insertSupplierSchema>;
 export type Supplier = typeof suppliers.$inferSelect;
 
-export const transactions = pgTable("transactions", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  supplierId: varchar("supplier_id").notNull(),
-  type: text("type").notNull(), // 'credit' | 'debit'
-  amount: real("amount").notNull(),
-  description: text("description"),
-  date: text("date").notNull(),
-});
+export const transactions = pgTable(
+  "transactions",
+  {
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+    supplierId: varchar("supplier_id").notNull(),
+    type: text("type").notNull(), // 'credit' | 'debit'
+    amount: real("amount").notNull(),
+    description: text("description"),
+    date: text("date").notNull(),
+  },
+  (table) => [
+    index("IDX_transactions_supplier_id").on(table.supplierId),
+    index("IDX_transactions_date").on(table.date),
+    index("IDX_transactions_type").on(table.type),
+  ]
+);
 
 export const insertTransactionSchema = createInsertSchema(transactions).omit({
   id: true,

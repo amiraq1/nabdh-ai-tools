@@ -1,9 +1,11 @@
-import type { Express } from "express";
-import { createServer, type Server } from "http";
+import type { Express, Request, Response } from "express";
+import { type Server } from "http";
 import { storage } from "./storage";
-import { insertSupplierSchema, insertTransactionSchema } from "@shared/schema";
+import { insertSupplierSchema, insertTransactionSchema, userRoles, type UserRole } from "@shared/schema";
 import { z } from "zod";
 import { setupAuth, isAuthenticated, requireRole } from "./auth";
+import { apiRateLimiter } from "./security";
+import { logger } from "./logger";
 import { 
   uploadBackupToGoogleDrive, 
   listBackups, 
@@ -12,31 +14,49 @@ import {
   checkGoogleDriveConnection 
 } from "./googleDrive";
 
+const buildHealthPayload = () => ({
+  status: "ok",
+  timestamp: new Date().toISOString(),
+  uptime: process.uptime(),
+});
+
+const sendHealth = (_req: Request, res: Response) => {
+  res.status(200).json(buildHealthPayload());
+};
+
+const parsePaginationParams = (query: Request["query"]) => {
+  const parsePositiveInt = (value: unknown, fallback: number, max?: number) => {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric) || numeric <= 0) return fallback;
+    const safeValue = Math.floor(numeric);
+    return max ? Math.min(safeValue, max) : safeValue;
+  };
+
+  return {
+    page: parsePositiveInt(query.page, 1),
+    limit: parsePositiveInt(query.limit, 20, 100),
+  };
+};
+
+const isValidRole = (role: unknown): role is UserRole =>
+  typeof role === "string" && (userRoles as readonly string[]).includes(role);
+
+const adminOnly: UserRole[] = ["admin"];
+const editorOrAdmin: UserRole[] = ["admin", "editor"];
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
   
   // Health check endpoint for Railway and monitoring
-  app.get("/health", (_req, res) => {
-    res.status(200).json({ 
-      status: "ok", 
-      timestamp: new Date().toISOString(),
-      uptime: process.uptime()
-    });
-  });
+  app.get("/health", sendHealth);
 
-  app.get("/api/health", (_req, res) => {
-    res.status(200).json({ 
-      status: "ok", 
-      timestamp: new Date().toISOString(),
-      uptime: process.uptime()
-    });
-  });
+  app.get("/api/health", sendHealth);
   
   await setupAuth(app);
 
-  app.get("/api/auth/user", async (req: any, res) => {
+  app.get("/api/auth/user", async (req: Request, res: Response) => {
     try {
       if (!req.isAuthenticated() || !req.user?.id) {
         return res.status(401).json({ message: "Unauthorized" });
@@ -50,15 +70,14 @@ export async function registerRoutes(
         res.status(404).json({ message: "User not found" });
       }
     } catch (error) {
-      console.error("Error fetching user:", error);
+      logger.error({ err: error }, "Error fetching user");
       res.status(500).json({ message: "Failed to fetch user" });
     }
   });
 
-  app.get("/api/users", isAuthenticated, requireRole(["admin"]), async (req, res) => {
+  app.get("/api/users", apiRateLimiter, isAuthenticated, requireRole(adminOnly), async (req: Request, res) => {
     try {
-      const page = Math.max(1, parseInt(req.query.page as string) || 1);
-      const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 20));
+      const { page, limit } = parsePaginationParams(req.query);
       const result = await storage.getUsers(page, limit);
       res.json(result);
     } catch (error) {
@@ -66,15 +85,15 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/users/:id/role", isAuthenticated, requireRole(["admin"]), async (req: any, res) => {
+  app.patch("/api/users/:id/role", isAuthenticated, requireRole(adminOnly), async (req: Request<{ id: string }, unknown, { role?: UserRole }>, res) => {
     try {
       const { role } = req.body;
-      if (!["admin", "editor", "viewer"].includes(role)) {
+      if (!isValidRole(role)) {
         return res.status(400).json({ error: "Invalid role" });
       }
       
       const currentUserId = req.user?.id;
-      if (currentUserId === req.params.id && role !== "admin") {
+      if (currentUserId !== undefined && String(currentUserId) === String(req.params.id) && role !== "admin") {
         return res.status(403).json({ error: "لا يمكنك خفض رتبتك الخاصة" });
       }
       
@@ -109,7 +128,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/suppliers", isAuthenticated, requireRole(["admin", "editor"]), async (req, res) => {
+  app.post("/api/suppliers", isAuthenticated, requireRole(editorOrAdmin), async (req, res) => {
     try {
       const validatedData = insertSupplierSchema.parse(req.body);
       const supplier = await storage.createSupplier(validatedData);
@@ -122,7 +141,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/suppliers/:id", isAuthenticated, requireRole(["admin", "editor"]), async (req, res) => {
+  app.patch("/api/suppliers/:id", isAuthenticated, requireRole(editorOrAdmin), async (req, res) => {
     try {
       const validatedData = insertSupplierSchema.partial().parse(req.body);
       const supplier = await storage.updateSupplier(req.params.id, validatedData);
@@ -138,7 +157,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/suppliers/:id", isAuthenticated, requireRole(["admin"]), async (req, res) => {
+  app.delete("/api/suppliers/:id", isAuthenticated, requireRole(adminOnly), async (req, res) => {
     try {
       await storage.deleteTransactionsBySupplier(req.params.id);
       const deleted = await storage.deleteSupplier(req.params.id);
@@ -181,7 +200,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/transactions", isAuthenticated, requireRole(["admin", "editor"]), async (req, res) => {
+  app.post("/api/transactions", isAuthenticated, requireRole(editorOrAdmin), async (req, res) => {
     try {
       const validatedData = insertTransactionSchema.parse(req.body);
       
@@ -200,7 +219,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/transactions/:id", isAuthenticated, requireRole(["admin"]), async (req, res) => {
+  app.delete("/api/transactions/:id", isAuthenticated, requireRole(adminOnly), async (req, res) => {
     try {
       const deleted = await storage.deleteTransaction(req.params.id);
       if (!deleted) {
@@ -212,7 +231,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/google-drive/status", isAuthenticated, requireRole(["admin"]), async (_req, res) => {
+  app.get("/api/google-drive/status", isAuthenticated, requireRole(adminOnly), async (_req, res) => {
     try {
       const status = await checkGoogleDriveConnection();
       res.json(status);
@@ -221,7 +240,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/google-drive/backups", isAuthenticated, requireRole(["admin"]), async (_req, res) => {
+  app.get("/api/google-drive/backups", isAuthenticated, requireRole(adminOnly), async (_req, res) => {
     try {
       const backups = await listBackups();
       res.json(backups);
@@ -230,7 +249,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/google-drive/backup", isAuthenticated, requireRole(["admin"]), async (req: any, res) => {
+  app.post("/api/google-drive/backup", isAuthenticated, requireRole(adminOnly), async (req: Request, res) => {
     try {
       const suppliers = await storage.getSuppliers();
       const transactions = await storage.getTransactions();
@@ -252,12 +271,12 @@ export async function registerRoutes(
       
       res.json(result);
     } catch (error) {
-      console.error("Backup error:", error);
+      logger.error({ err: error }, "Backup error");
       res.status(500).json({ error: "Failed to create backup" });
     }
   });
 
-  app.get("/api/google-drive/backups/:fileId", isAuthenticated, requireRole(["admin"]), async (req, res) => {
+  app.get("/api/google-drive/backups/:fileId", isAuthenticated, requireRole(adminOnly), async (req, res) => {
     try {
       const backup = await downloadBackup(req.params.fileId);
       res.json(backup);
@@ -266,7 +285,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/google-drive/backups/:fileId", isAuthenticated, requireRole(["admin"]), async (req, res) => {
+  app.delete("/api/google-drive/backups/:fileId", isAuthenticated, requireRole(adminOnly), async (req, res) => {
     try {
       await deleteBackup(req.params.fileId);
       res.status(204).send();

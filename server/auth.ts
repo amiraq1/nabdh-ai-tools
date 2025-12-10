@@ -1,36 +1,53 @@
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
-import { OAuth2Strategy as GoogleStrategy } from "passport-google-oauth20";
+import {
+  Strategy as GoogleStrategy,
+  type Profile as GoogleProfile,
+} from "passport-google-oauth20";
+import {
+  Strategy as GithubStrategy,
+  type Profile as GithubProfile,
+} from "passport-github2";
+import { Strategy as MicrosoftStrategy } from "passport-microsoft";
 import session from "express-session";
 import type { Express, RequestHandler } from "express";
 import connectPg from "connect-pg-simple";
 import bcrypt from "bcrypt";
 import { storage } from "./storage";
+import { userRoles, type UserRole } from "@shared/schema";
+import { authRateLimiter, validatePasswordStrength, isValidEmail, sanitizeInput } from "./security";
+import { env } from "./config";
+import { logger } from "./logger";
+
+const isUserRole = (role: unknown): role is UserRole =>
+  typeof role === "string" && (userRoles as readonly string[]).includes(role);
 
 export function getSession() {
   const sessionTtl = 7 * 24 * 60 * 60 * 1000;
   const pgStore = connectPg(session);
 
   const sessionStore = new pgStore({
-    conString: process.env.DATABASE_URL!,
-    // ✅ خليها true عشان ينشئ جدول sessions لو مش موجود
+    conString: env.DATABASE_URL,
     createTableIfMissing: true,
     ttl: sessionTtl,
     tableName: "sessions",
   });
 
   return session({
-    secret: process.env.SESSION_SECRET!,
+    secret: env.SESSION_SECRET,
     store: sessionStore,
     resave: false,
     saveUninitialized: false,
     proxy: true,
+    name: "sessionId",
     cookie: {
       httpOnly: true,
-      secure: "auto",
+      secure: env.SESSION_COOKIE_SECURE,
       sameSite: "lax",
       maxAge: sessionTtl,
+      domain: env.COOKIE_DOMAIN || undefined,
     },
+    rolling: true,
   });
 }
 
@@ -52,69 +69,223 @@ export async function setupAuth(app: Express) {
           }
 
           if (!user.password) {
-            return done(null, false, { message: "يرجى إعادة تعيين كلمة المرور" });
+            return done(null, false, { message: "الحساب لا يدعم تسجيل الدخول بكلمة مرور" });
           }
 
+          // Add small delay to prevent timing attacks
           const isValid = await bcrypt.compare(password, user.password);
           if (!isValid) {
+            await new Promise(resolve => setTimeout(resolve, 100));
             return done(null, false, { message: "كلمة المرور غير صحيحة" });
           }
 
           return done(null, user);
         } catch (error) {
-          console.error("LocalStrategy error:", error); // 👈 يساعد في الـ Logs
+          logger.error({ err: error }, "LocalStrategy error");
           return done(error);
         }
       }
     )
   );
 
-  // Google OAuth Strategy
-  passport.use(
-    new GoogleStrategy(
-      {
-        clientID: process.env.GOOGLE_CLIENT_ID!,
-        clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-        callbackURL: process.env.GOOGLE_CALLBACK_URL!,
-        scope: ["profile", "email"],
-      },
-      async (accessToken, refreshToken, profile, done) => {
-        try {
-          const email = profile.emails?.[0]?.value;
-          if (!email) {
-            return done(new Error("Google profile missing email"), false);
-          }
+  // Helper: upsert user from social profile
+  async function findOrCreateOAuthUser(params: {
+    email?: string | null;
+    firstName?: string | null;
+    lastName?: string | null;
+    profileImageUrl?: string | null;
+    providerId: string;
+  }) {
+    const email = params.email ?? undefined;
 
-          let user = await storage.getUserByEmail(email);
+    if (!email) {
+      throw new Error("No email returned from OAuth provider");
+    }
 
-          if (user) {
-            return done(null, user);
-          } else {
-            // User does not exist, create a new one
-            const usersCount = await storage.getUsersCount();
-            const newUser = await storage.createUser({
+    let user = await storage.getUserByEmail(email);
+
+    if (!user) {
+      const usersCount = await storage.getUsersCount();
+      user = await storage.createUser({
+        email,
+        password: null,
+        firstName: params.firstName ?? null,
+        lastName: params.lastName ?? null,
+        profileImageUrl: params.profileImageUrl ?? null,
+        role: usersCount === 0 ? "admin" : "viewer",
+      });
+    }
+
+    return user;
+  }
+
+  // Google OAuth2
+  if (env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET) {
+    passport.use(
+      new GoogleStrategy(
+        {
+          clientID: env.GOOGLE_CLIENT_ID,
+          clientSecret: env.GOOGLE_CLIENT_SECRET,
+          callbackURL: env.GOOGLE_CALLBACK_URL || "/api/auth/google/callback",
+        },
+        async (_accessToken, _refreshToken, profile: GoogleProfile, done) => {
+          try {
+            const email = profile.emails?.[0]?.value || null;
+            const firstName = profile.name?.givenName || null;
+            const lastName = profile.name?.familyName || null;
+            const avatar = (profile.photos && profile.photos[0]?.value) || null;
+
+            const user = await findOrCreateOAuthUser({
               email,
-              firstName: profile.name?.givenName || null,
-              lastName: profile.name?.familyName || null,
-              role: usersCount === 0 ? "admin" : "viewer",
-              // No password for OAuth users
+              firstName,
+              lastName,
+              profileImageUrl: avatar,
+              providerId: profile.id,
             });
-            return done(null, newUser);
-          }
-        } catch (error) {
-          console.error("GoogleStrategy error:", error);
-          return done(error);
-        }
-      }
-    )
-  );
 
-  // نخزّن فقط id في الـ session
+            done(null, user);
+          } catch (error) {
+            done(error as any);
+          }
+        },
+      ),
+    );
+
+    app.get(
+      "/api/auth/google",
+      passport.authenticate("google", {
+        scope: ["profile", "email"],
+      }),
+    );
+
+    app.get(
+      "/api/auth/google/callback",
+      passport.authenticate("google", {
+        failureRedirect: "/login",
+      }),
+      (_req, res) => {
+        res.redirect("/");
+      },
+    );
+  }
+
+  // GitHub OAuth2
+  if (env.GITHUB_CLIENT_ID && env.GITHUB_CLIENT_SECRET) {
+    passport.use(
+      new GithubStrategy(
+        {
+          clientID: env.GITHUB_CLIENT_ID,
+          clientSecret: env.GITHUB_CLIENT_SECRET,
+          callbackURL: env.GITHUB_CALLBACK_URL || "/api/auth/github/callback",
+          scope: ["user:email"],
+        },
+        async (
+          _accessToken: string,
+          _refreshToken: string,
+          profile: GithubProfile,
+          done: (err: any, user?: any) => void,
+        ) => {
+          try {
+            const primaryEmail = (profile.emails && profile.emails[0]?.value) || null;
+            const displayName = profile.displayName || profile.username || "";
+            const [firstName, ...rest] = displayName.split(" ");
+            const lastName = rest.join(" ") || null;
+            const avatar = (profile.photos && profile.photos[0]?.value) || null;
+
+            const user = await findOrCreateOAuthUser({
+              email: primaryEmail,
+              firstName: firstName || null,
+              lastName,
+              profileImageUrl: avatar,
+              providerId: profile.id,
+            });
+
+            done(null, user);
+          } catch (error) {
+            done(error as any);
+          }
+        },
+      ),
+    );
+
+    app.get("/api/auth/github", passport.authenticate("github"));
+
+    app.get(
+      "/api/auth/github/callback",
+      passport.authenticate("github", {
+        failureRedirect: "/login",
+      }),
+      (_req, res) => {
+        res.redirect("/");
+      },
+    );
+  }
+
+  // Microsoft OAuth2
+  if (env.MS_CLIENT_ID && env.MS_CLIENT_SECRET) {
+    passport.use(
+      new MicrosoftStrategy(
+        {
+          clientID: env.MS_CLIENT_ID,
+          clientSecret: env.MS_CLIENT_SECRET,
+          callbackURL: env.MS_CALLBACK_URL || "/api/auth/microsoft/callback",
+          scope: ["user.read"],
+          tenant: "common",
+        },
+        async (
+          _accessToken: string,
+          _refreshToken: string,
+          profile: any,
+          done: (err: any, user?: any) => void,
+        ) => {
+          try {
+            const email =
+              (profile.emails && profile.emails[0]?.value) ||
+              profile._json?.mail ||
+              profile._json?.userPrincipalName ||
+              null;
+            const firstName = profile.name?.givenName || profile._json?.givenName || null;
+            const lastName = profile.name?.familyName || profile._json?.surname || null;
+            const avatar = (profile.photos && profile.photos[0]?.value) || null;
+
+            const user = await findOrCreateOAuthUser({
+              email,
+              firstName,
+              lastName,
+              profileImageUrl: avatar,
+              providerId: profile.id,
+            });
+
+            done(null, user);
+          } catch (error) {
+            done(error as any);
+          }
+        },
+      ),
+    );
+
+    app.get(
+      "/api/auth/microsoft",
+      passport.authenticate("microsoft", {
+        prompt: "select_account",
+      }),
+    );
+
+    app.get(
+      "/api/auth/microsoft/callback",
+      passport.authenticate("microsoft", {
+        failureRedirect: "/login",
+      }),
+      (_req, res) => {
+        res.redirect("/");
+      },
+    );
+  }
+
   passport.serializeUser((user: any, done) => {
     done(null, user.id);
   });
 
-  // نسترجع المستخدم الكامل من الـ DB
   passport.deserializeUser(async (id: string, done) => {
     try {
       const user = await storage.getUser(id);
@@ -124,59 +295,73 @@ export async function setupAuth(app: Express) {
     }
   });
 
-  app.post("/api/auth/register", async (req, res) => {
+  app.post("/api/auth/register", authRateLimiter, async (req, res) => {
     try {
-      const { email, password, firstName, lastName } = req.body;
+      let { email, password, firstName, lastName } = req.body;
 
       if (!email || !password) {
-        return res.status(400).json({ message: "البريد الإلكتروني وكلمة المرور مطلوبان" });
+        return res.status(400).json({ message: "البريد الإلكتروني وكلمة المرور مطلوبة" });
       }
+
+      email = sanitizeInput(email.toLowerCase().trim());
+
+      if (!isValidEmail(email)) {
+        return res.status(400).json({ message: "صيغة البريد الإلكتروني غير صحيحة" });
+      }
+
+      const passwordValidation = validatePasswordStrength(password);
+      if (!passwordValidation.valid) {
+        return res.status(400).json({ message: passwordValidation.message });
+      }
+
+      firstName = firstName ? sanitizeInput(firstName) : null;
+      lastName = lastName ? sanitizeInput(lastName) : null;
 
       const existingUser = await storage.getUserByEmail(email);
       if (existingUser) {
-        return res.status(400).json({ message: "البريد الإلكتروني مستخدم بالفعل" });
+        return res.status(400).json({ message: "البريد الإلكتروني مسجل مسبقاً" });
       }
 
-      const hashedPassword = await bcrypt.hash(password, 10);
+      const hashedPassword = await bcrypt.hash(password, 12);
       const usersCount = await storage.getUsersCount();
 
       const user = await storage.createUser({
         email,
         password: hashedPassword,
-        firstName: firstName || null,
-        lastName: lastName || null,
+        firstName,
+        lastName,
         role: usersCount === 0 ? "admin" : "viewer",
       });
 
       req.login(user, (err) => {
         if (err) {
-          console.error("Login after register error:", err);
-          return res.status(500).json({ message: "خطأ في تسجيل الدخول" });
+          logger.error({ err }, "Login after register error");
+          return res.status(500).json({ message: "حدث خطأ أثناء تسجيل الدخول" });
         }
         const { password: _, ...userWithoutPassword } = user;
         return res.status(201).json(userWithoutPassword);
       });
     } catch (error) {
-      console.error("Registration error:", error);
-      res.status(500).json({ message: "حدث خطأ في التسجيل" });
+      logger.error({ err: error }, "Registration error");
+      res.status(500).json({ message: "حدث خطأ غير متوقع أثناء التسجيل" });
     }
   });
 
-  app.post("/api/auth/login", (req, res, next) => {
+  app.post("/api/auth/login", authRateLimiter, (req, res, next) => {
     passport.authenticate("local", (err: any, user: any, info: any) => {
       if (err) {
-        console.error("Login strategy error:", err); // 👈 يوضح السبب في الـ Logs
-        return res.status(500).json({ message: "خطأ في الخادم" });
+        logger.error({ err }, "Login strategy error");
+        return res.status(500).json({ message: "حدث خطأ أثناء تسجيل الدخول" });
       }
       if (!user) {
         return res
           .status(401)
-          .json({ message: info?.message || "فشل تسجيل الدخول" });
+          .json({ message: info?.message || "بيانات الدخول غير صحيحة" });
       }
-      req.login(user, (err) => {
-        if (err) {
-          console.error("Session save error:", err); // 👈 لو المشكلة من sessions
-          return res.status(500).json({ message: "خطأ في تسجيل الدخول" });
+      req.login(user, (loginErr) => {
+        if (loginErr) {
+          logger.error({ err: loginErr }, "Session save error");
+          return res.status(500).json({ message: "حدث خطأ أثناء حفظ الجلسة" });
         }
         const { password: _, ...userWithoutPassword } = user;
         return res.json(userWithoutPassword);
@@ -184,28 +369,10 @@ export async function setupAuth(app: Express) {
     })(req, res, next);
   });
 
-  // Google OAuth Routes
-  app.get(
-    "/api/auth/google",
-    passport.authenticate("google", { scope: ["profile", "email"] })
-  );
-
-  app.get(
-    "/api/auth/google/callback",
-    passport.authenticate("google", {
-      failureRedirect: "/login",
-      session: true,
-    }),
-    (req, res) => {
-      // Successful authentication, redirect home.
-      res.redirect("/"); // Client-side will handle redirect to /dashboard
-    }
-  );
-
   app.post("/api/auth/logout", (req, res) => {
     req.logout((err) => {
       if (err) {
-        return res.status(500).json({ message: "خطأ في تسجيل الخروج" });
+        return res.status(500).json({ message: "حدث خطأ أثناء تسجيل الخروج" });
       }
       res.json({ message: "تم تسجيل الخروج بنجاح" });
     });
@@ -220,10 +387,9 @@ export async function setupAuth(app: Express) {
         const { id } = req.params;
         const { password } = req.body;
 
-        if (!password || password.length < 6) {
-          return res
-            .status(400)
-            .json({ message: "كلمة المرور يجب أن تكون 6 أحرف على الأقل" });
+        const passwordValidation = validatePasswordStrength(password);
+        if (!passwordValidation.valid) {
+          return res.status(400).json({ message: passwordValidation.message });
         }
 
         const user = await storage.getUser(id);
@@ -235,18 +401,19 @@ export async function setupAuth(app: Express) {
         const updatedUser = await storage.updateUserPassword(id, hashedPassword);
 
         if (!updatedUser) {
-          return res.status(500).json({ message: "فشل في تحديث كلمة المرور" });
+          return res.status(500).json({ message: "تعذر تحديث كلمة المرور" });
         }
 
-        console.log(
-          `Admin ${(req.user as any)?.email} reset password for user ${user.email}`
+        logger.info(
+          { admin: (req.user as any)?.email, userEmail: user.email },
+          "Admin reset password for user"
         );
 
         const { password: _, ...userWithoutPassword } = updatedUser;
         res.json(userWithoutPassword);
       } catch (error) {
-        console.error("Password reset error:", error);
-        res.status(500).json({ message: "حدث خطأ في تحديث كلمة المرور" });
+        logger.error({ err: error }, "Password reset error");
+        res.status(500).json({ message: "حدث خطأ غير متوقع أثناء إعادة التعيين" });
       }
     }
   );
@@ -260,7 +427,7 @@ export const isAuthenticated: RequestHandler = (req, res, next) => {
   return res.status(401).json({ message: "Unauthorized" });
 };
 
-export const requireRole = (roles: string[]): RequestHandler => {
+export const requireRole = (roles: UserRole[]): RequestHandler => {
   return async (req, res, next) => {
     const user = req.user as any;
     if (!user?.id) {
@@ -268,7 +435,9 @@ export const requireRole = (roles: string[]): RequestHandler => {
     }
 
     const dbUser = await storage.getUser(user.id);
-    if (!dbUser || !roles.includes(dbUser.role)) {
+    const dbUserRole = isUserRole(dbUser?.role) ? dbUser.role : null;
+
+    if (!dbUserRole || !roles.includes(dbUserRole)) {
       return res.status(403).json({ message: "Forbidden" });
     }
 
