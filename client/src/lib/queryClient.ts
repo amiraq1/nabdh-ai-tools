@@ -13,8 +13,10 @@ async function throwIfResNotOk(res: Response) {
         errorMessage = text || res.statusText;
       }
     } catch (parseError) {
-      // If parsing fails, log and use statusText
-      console.warn("Failed to parse error response:", parseError);
+      // If parsing fails, use statusText
+      if (process.env.NODE_ENV === "development") {
+        console.warn("Failed to parse error response:", parseError);
+      }
       errorMessage = res.statusText;
     }
     throw new Error(`${res.status}: ${errorMessage}`);
