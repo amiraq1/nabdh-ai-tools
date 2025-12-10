@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Heart, Loader2, Eye, EyeOff } from "lucide-react";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient, extractErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
 const loginSchema = z.object({
@@ -74,8 +74,7 @@ export default function Login() {
       navigate("/");
     },
     onError: (error: any) => {
-      // Extract the message after the status code (e.g., "401: message" -> "message")
-      const errorMessage = error.message?.replace(/^\d+:\s*/, "") || "تحقق من بياناتك وحاول مرة أخرى";
+      const errorMessage = extractErrorMessage(error) || "تحقق من بياناتك وحاول مرة أخرى";
       toast({
         title: "فشل تسجيل الدخول",
         description: errorMessage,
@@ -103,8 +102,7 @@ export default function Login() {
       navigate("/");
     },
     onError: (error: any) => {
-      // Extract the message after the status code (e.g., "400: message" -> "message")
-      const errorMessage = error.message?.replace(/^\d+:\s*/, "") || "تحقق من بياناتك وحاول مرة أخرى";
+      const errorMessage = extractErrorMessage(error) || "تحقق من بياناتك وحاول مرة أخرى";
       toast({
         title: "فشل إنشاء الحساب",
         description: errorMessage,

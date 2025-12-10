@@ -12,12 +12,20 @@ async function throwIfResNotOk(res: Response) {
         const text = await res.text();
         errorMessage = text || res.statusText;
       }
-    } catch {
-      // If parsing fails, use statusText
+    } catch (parseError) {
+      // If parsing fails, log and use statusText
+      console.warn("Failed to parse error response:", parseError);
       errorMessage = res.statusText;
     }
     throw new Error(`${res.status}: ${errorMessage}`);
   }
+}
+
+// Extract clean error message by removing status code prefix
+export function extractErrorMessage(error: Error | any): string {
+  const message = error?.message || "";
+  // Remove status code prefix (e.g., "401: message" -> "message")
+  return message.replace(/^\d+:\s*/, "");
 }
 
 export async function apiRequest(
