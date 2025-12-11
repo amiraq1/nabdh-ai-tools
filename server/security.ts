@@ -60,8 +60,8 @@ export function setupSecurityHeaders(app: Express) {
 // Rate limiting for authentication endpoints
 export const authRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // Limit each IP to 5 requests per windowMs
-  message: "تم تجاوز عدد المحاولات المسموح بها. يرجى المحاولة لاحقاً.",
+  max: 10, // Limit each IP to 10 requests per windowMs (increased from 5)
+  message: { message: "تم تجاوز عدد المحاولات المسموح بها. يرجى المحاولة بعد 15 دقيقة." },
   standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
   legacyHeaders: false, // Disable the `X-RateLimit-*` headers
   skipSuccessfulRequests: true, // Don't count successful requests
