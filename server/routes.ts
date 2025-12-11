@@ -6,6 +6,7 @@ import { z } from "zod";
 import { setupAuth, isAuthenticated, requireRole } from "./auth";
 import { apiRateLimiter } from "./security";
 import { logger } from "./logger";
+import { sanitizeUser } from "./user-sanitizer";
 import { 
   uploadBackupToGoogleDrive, 
   listBackups, 
@@ -64,8 +65,7 @@ export async function registerRoutes(
       const userId = req.user.id;
       const user = await storage.getUser(userId);
       if (user) {
-        const { password: _, ...userWithoutPassword } = user;
-        res.json(userWithoutPassword);
+        res.json(sanitizeUser(user));
       } else {
         res.status(404).json({ message: "User not found" });
       }
@@ -79,7 +79,10 @@ export async function registerRoutes(
     try {
       const { page, limit } = parsePaginationParams(req.query);
       const result = await storage.getUsers(page, limit);
-      res.json(result);
+      res.json({
+        ...result,
+        users: result.users.map((u) => sanitizeUser(u)),
+      });
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch users" });
     }
@@ -101,7 +104,7 @@ export async function registerRoutes(
       if (!user) {
         return res.status(404).json({ error: "User not found" });
       }
-      res.json(user);
+      res.json(sanitizeUser(user));
     } catch (error) {
       res.status(500).json({ error: "Failed to update user role" });
     }
@@ -266,7 +269,7 @@ export async function registerRoutes(
       const result = await uploadBackupToGoogleDrive({
         suppliers,
         transactions,
-        users: usersData.users,
+        users: usersData.users.map((u) => sanitizeUser(u)),
       }, createdBy);
       
       res.json(result);

@@ -1,6 +1,7 @@
 import { type Supplier, type InsertSupplier, type Transaction, type InsertTransaction, type User, type InsertUser, suppliers, transactions, users } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, sql, count } from "drizzle-orm";
+import { sanitizeUsers } from "./user-sanitizer";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -96,7 +97,7 @@ export class DatabaseStorage implements IStorage {
     return Number(result?.count ?? 0);
   }
 
-  async getUsers(page: number = 1, limit: number = 20): Promise<{ users: User[]; total: number; page: number; limit: number; totalPages: number }> {
+  async getUsers(page: number = 1, limit: number = 20): Promise<{ users: Omit<User, "password">[]; total: number; page: number; limit: number; totalPages: number }> {
     const offset = (page - 1) * limit;
     
     const [countResult] = await db.select({ total: count() }).from(users);
@@ -109,7 +110,7 @@ export class DatabaseStorage implements IStorage {
       .offset(offset);
     
     return {
-      users: usersList,
+      users: sanitizeUsers(usersList),
       total,
       page,
       limit,

@@ -12,7 +12,8 @@
     "start:prod": "npm run db:migrate && npm run start",
     "check": "tsc",
     "db:push": "drizzle-kit push",
-    "set-admin": "tsx script/set-admin.ts"
+    "set-admin": "tsx script/set-admin.ts",
+    "test:sanitize": "tsx script/sanitize-user.test.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
