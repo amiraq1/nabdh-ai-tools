@@ -35,6 +35,10 @@ const EnvSchema = z.object({
   MS_CLIENT_ID: z.string().optional(),
   MS_CLIENT_SECRET: z.string().optional(),
   MS_CALLBACK_URL: z.string().optional(),
+  // Google Drive backup options
+  GOOGLE_SERVICE_ACCOUNT_KEY: z.string().optional(), // JSON string of service account
+  GOOGLE_DRIVE_REFRESH_TOKEN: z.string().optional(), // OAuth2 refresh token
+  // Replit environment
   ISSUER_URL: z.string().optional(),
   REPL_ID: z.string().optional(),
   REPL_IDENTITY: z.string().optional(),
