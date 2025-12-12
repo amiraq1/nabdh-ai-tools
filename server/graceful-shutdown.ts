@@ -7,45 +7,44 @@ import { logger } from "./logger";
  * This ensures connections are closed properly when the app is terminated
  */
 export function setupGracefulShutdown(httpServer: Server) {
-  const shutdown = async (signal: string) => {
+  let isShuttingDown = false;
+  let forceTimeout: NodeJS.Timeout | null = null;
+
+  const shutdown = (signal: string) => {
+    if (isShuttingDown) {
+      logger.warn({ signal }, "Shutdown already in progress");
+      return;
+    }
+    isShuttingDown = true;
+
     logger.info({ signal }, "Starting graceful shutdown");
-    
+
+    // Force shutdown after 30 seconds
+    forceTimeout = setTimeout(() => {
+      logger.error("Forceful shutdown after timeout");
+      process.exit(1);
+    }, 30_000);
+
     // Stop accepting new connections
-    httpServer.close(async () => {
-      logger.info("HTTP server closed");
-      
+    httpServer.close(async (err) => {
+      logger.info({ err }, "HTTP server closed");
+
       try {
         // Close database connections
         await pool.end();
         logger.info("Database connections closed");
-        
+
+        if (forceTimeout) clearTimeout(forceTimeout);
         logger.info("Graceful shutdown completed");
         process.exit(0);
       } catch (error) {
+        if (forceTimeout) clearTimeout(forceTimeout);
         logger.error({ err: error }, "Error during graceful shutdown");
         process.exit(1);
       }
     });
-    
-    // Force shutdown after 30 seconds
-    setTimeout(() => {
-      logger.error("Forceful shutdown after timeout");
-      process.exit(1);
-    }, 30000);
   };
-  
-  // Listen for termination signals
-  process.on("SIGTERM", () => shutdown("SIGTERM"));
+
   process.on("SIGINT", () => shutdown("SIGINT"));
-  
-  // Handle uncaught errors
-  process.on("uncaughtException", (error) => {
-    logger.error({ err: error }, "Uncaught Exception");
-    shutdown("UNCAUGHT_EXCEPTION");
-  });
-  
-  process.on("unhandledRejection", (reason, promise) => {
-    logger.error({ promise, reason }, "Unhandled Rejection");
-    shutdown("UNHANDLED_REJECTION");
-  });
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
 }
