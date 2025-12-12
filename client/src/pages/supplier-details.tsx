@@ -54,8 +54,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { exportSupplierReportToPDF, numberToArabicWords } from "@/lib/export-utils";
-import * as XLSX from "xlsx";
+import { numberToArabicWords } from "@/lib/arabic-numbers";
+// Lazy load export utils for better performance
+const loadExportUtils = () => import("@/lib/export-utils");
+const loadXLSX = () => import("xlsx");
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useLocation, useParams } from "wouter";
 import { useToast } from "@/hooks/use-toast";
@@ -205,7 +207,8 @@ export default function SupplierDetails() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem 
-                onClick={() => {
+                onClick={async () => {
+                  const XLSX = await loadXLSX();
                   const data = transactions.map((t) => ({
                     "التاريخ": t.date,
                     "النوع": t.type === "debit" ? "مشتريات (له)" : "دفعة (منه)",
@@ -223,7 +226,10 @@ export default function SupplierDetails() {
                 تصدير Excel
               </DropdownMenuItem>
               <DropdownMenuItem 
-                onClick={() => exportSupplierReportToPDF(supplier, transactions)}
+                onClick={async () => {
+                  const { exportSupplierReportToPDF } = await loadExportUtils();
+                  exportSupplierReportToPDF(supplier, transactions);
+                }}
                 data-testid="button-export-supplier-pdf"
               >
                 <FileText className="h-4 w-4 ml-2" />

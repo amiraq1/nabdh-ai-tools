@@ -2,7 +2,7 @@ import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { Users, TrendingUp, FileText, Shield, BarChart3, Bell } from "lucide-react";
+import { Users, Heart, FileText, Shield, BarChart3, Bell } from "lucide-react";
 
 export default function Landing() {
   const features = [
@@ -12,7 +12,7 @@ export default function Landing() {
       description: "أضف وعدّل وتابع جميع الموردين في مكان واحد"
     },
     {
-      icon: TrendingUp,
+      icon: Heart,
       title: "تتبع الأرصدة",
       description: "راقب أرصدة الموردين بشكل مباشر ودقيق"
     },
@@ -44,9 +44,9 @@ export default function Landing() {
         <div className="container mx-auto flex h-16 items-center justify-between px-4">
           <div className="flex items-center gap-2">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-              <TrendingUp className="h-5 w-5" />
+              <Heart className="h-5 w-5 fill-current" />
             </div>
-            <span className="text-xl font-bold">نظام إدارة الموردين</span>
+            <span className="text-xl font-bold">نبض</span>
           </div>
           <div className="flex items-center gap-3">
             <ThemeToggle />
@@ -62,11 +62,17 @@ export default function Landing() {
       <main>
         <section className="py-20 px-4">
           <div className="container mx-auto text-center max-w-4xl">
-            <h1 className="text-4xl md:text-5xl font-bold mb-6 leading-tight">
+            <div className="flex items-center justify-center gap-3 mb-6">
+              <Heart className="h-12 w-12 text-primary fill-current" />
+              <h1 className="text-4xl md:text-5xl font-bold leading-tight">
+                نبض
+              </h1>
+            </div>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4 leading-tight">
               أدِر مورديك وأرصدتك
               <br />
               <span className="text-primary">بكفاءة وسهولة</span>
-            </h1>
+            </h2>
             <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
               نظام متكامل لإدارة الموردين والمعاملات المالية، مع تقارير تفصيلية
               ورسوم بيانية تفاعلية ونظام إشعارات ذكي
@@ -121,7 +127,11 @@ export default function Landing() {
 
       <footer className="border-t py-8 px-4">
         <div className="container mx-auto text-center text-muted-foreground">
-          <p>نظام إدارة الموردين والأرصدة</p>
+          <div className="flex items-center justify-center gap-2 mb-2">
+            <Heart className="h-5 w-5 text-primary fill-current" />
+            <p className="font-semibold">نبض</p>
+          </div>
+          <p className="text-sm">نظام إدارة الموردين والأرصدة</p>
         </div>
       </footer>
     </div>

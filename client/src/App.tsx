@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -9,32 +10,43 @@ import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/s
 import NotificationsDropdown from "@/components/notifications-dropdown";
 import { AppSidebar } from "@/components/app-sidebar";
 import { useAuth } from "@/hooks/useAuth";
-import Dashboard from "@/pages/dashboard";
-import SuppliersList from "@/pages/suppliers-list";
-import SupplierForm from "@/pages/supplier-form";
-import SupplierDetails from "@/pages/supplier-details";
-import TransactionsList from "@/pages/transactions-list";
-import UsersManagement from "@/pages/users-management";
-import GoogleDriveBackup from "@/pages/google-drive-backup";
-import Landing from "@/pages/landing";
-import Login from "@/pages/login";
-import NotFound from "@/pages/not-found";
 import { Loader2 } from "lucide-react";
 import { UserMenu } from "@/components/user-menu";
 
+// Lazy load pages for better performance
+const Dashboard = lazy(() => import("@/pages/dashboard"));
+const SuppliersList = lazy(() => import("@/pages/suppliers-list"));
+const SupplierForm = lazy(() => import("@/pages/supplier-form"));
+const SupplierDetails = lazy(() => import("@/pages/supplier-details"));
+const TransactionsList = lazy(() => import("@/pages/transactions-list"));
+const UsersManagement = lazy(() => import("@/pages/users-management"));
+const GoogleDriveBackup = lazy(() => import("@/pages/google-drive-backup"));
+const Landing = lazy(() => import("@/pages/landing"));
+const Login = lazy(() => import("@/pages/login"));
+const NotFound = lazy(() => import("@/pages/not-found"));
+
+// Loading component
+const PageLoader = () => (
+  <div className="flex h-screen w-full items-center justify-center">
+    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+  </div>
+);
+
 function AuthenticatedRouter() {
   return (
-    <Switch>
-      <Route path="/" component={Dashboard} />
-      <Route path="/suppliers" component={SuppliersList} />
-      <Route path="/suppliers/new" component={SupplierForm} />
-      <Route path="/suppliers/:id" component={SupplierDetails} />
-      <Route path="/suppliers/:id/edit" component={SupplierForm} />
-      <Route path="/transactions" component={TransactionsList} />
-      <Route path="/users" component={UsersManagement} />
-      <Route path="/backup" component={GoogleDriveBackup} />
-      <Route component={NotFound} />
-    </Switch>
+    <Suspense fallback={<PageLoader />}>
+      <Switch>
+        <Route path="/" component={Dashboard} />
+        <Route path="/suppliers" component={SuppliersList} />
+        <Route path="/suppliers/new" component={SupplierForm} />
+        <Route path="/suppliers/:id" component={SupplierDetails} />
+        <Route path="/suppliers/:id/edit" component={SupplierForm} />
+        <Route path="/transactions" component={TransactionsList} />
+        <Route path="/users" component={UsersManagement} />
+        <Route path="/backup" component={GoogleDriveBackup} />
+        <Route component={NotFound} />
+      </Switch>
+    </Suspense>
   );
 }
 
@@ -68,10 +80,12 @@ function AuthenticatedApp() {
 
 function UnauthenticatedRouter() {
   return (
-    <Switch>
-      <Route path="/login" component={Login} />
-      <Route component={Landing} />
-    </Switch>
+    <Suspense fallback={<PageLoader />}>
+      <Switch>
+        <Route path="/login" component={Login} />
+        <Route component={Landing} />
+      </Switch>
+    </Suspense>
   );
 }
 

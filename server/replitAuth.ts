@@ -7,12 +7,23 @@ import type { Express, RequestHandler } from "express";
 import memoize from "memoizee";
 import connectPg from "connect-pg-simple";
 import { storage } from "./storage";
+import { env } from "./config";
+
+type SessionUser = Express.User & {
+  claims?: ReturnType<client.TokenEndpointResponseHelpers["claims"]>;
+  access_token?: string;
+  refresh_token?: string;
+  expires_at?: number;
+};
 
 const getOidcConfig = memoize(
   async () => {
+    if (!env.REPL_ID) {
+      throw new Error("REPL_ID must be set for Replit auth");
+    }
     return await client.discovery(
-      new URL(process.env.ISSUER_URL ?? "https://replit.com/oidc"),
-      process.env.REPL_ID!
+      new URL(env.ISSUER_URL ?? "https://replit.com/oidc"),
+      env.REPL_ID
     );
   },
   { maxAge: 3600 * 1000 }
@@ -22,20 +33,20 @@ export function getSession() {
   const sessionTtl = 7 * 24 * 60 * 60 * 1000;
   const pgStore = connectPg(session);
   const sessionStore = new pgStore({
-    conString: process.env.DATABASE_URL,
+    conString: env.DATABASE_URL,
     createTableIfMissing: false,
     ttl: sessionTtl,
     tableName: "sessions",
   });
   return session({
-    secret: process.env.SESSION_SECRET!,
+    secret: env.SESSION_SECRET,
     store: sessionStore,
     resave: false,
     saveUninitialized: false,
     proxy: true,
     cookie: {
       httpOnly: true,
-      secure: "auto",
+      secure: env.NODE_ENV === "production",
       sameSite: "lax",
       maxAge: sessionTtl,
     },
@@ -43,13 +54,14 @@ export function getSession() {
 }
 
 function updateUserSession(
-  user: any,
+  user: SessionUser,
   tokens: client.TokenEndpointResponse & client.TokenEndpointResponseHelpers
 ) {
-  user.claims = tokens.claims();
+  const claims = tokens.claims();
+  user.claims = claims;
   user.access_token = tokens.access_token;
   user.refresh_token = tokens.refresh_token;
-  user.expires_at = user.claims?.exp;
+  user.expires_at = claims?.exp;
 }
 
 async function upsertUser(claims: any) {
@@ -74,10 +86,24 @@ export async function setupAuth(app: Express) {
     tokens: client.TokenEndpointResponse & client.TokenEndpointResponseHelpers,
     verified: passport.AuthenticateCallback
   ) => {
-    const user = {};
-    updateUserSession(user, tokens);
-    await upsertUser(tokens.claims());
-    verified(null, user);
+    const claims = tokens.claims();
+    if (!claims) {
+      return verified(new Error("Missing claims in token response"));
+    }
+
+    await upsertUser(claims);
+
+    const persistedUser = await storage.getUser(claims["sub"]);
+    if (!persistedUser) {
+      return verified(new Error("Unable to load user after upsert"));
+    }
+
+    const sessionUser: SessionUser = {
+      ...persistedUser,
+    };
+
+    updateUserSession(sessionUser, tokens);
+    verified(null, sessionUser);
   };
 
   const registeredStrategies = new Set<string>();
@@ -120,9 +146,13 @@ export async function setupAuth(app: Express) {
 
   app.get("/api/logout", (req, res) => {
     req.logout(() => {
+      if (!env.REPL_ID) {
+        res.status(500).json({ message: "REPL_ID is required for logout" });
+        return;
+      }
       res.redirect(
         client.buildEndSessionUrl(config, {
-          client_id: process.env.REPL_ID!,
+          client_id: env.REPL_ID,
           post_logout_redirect_uri: `${req.protocol}://${req.hostname}`,
         }).href
       );

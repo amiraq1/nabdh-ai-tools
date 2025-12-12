@@ -50,8 +50,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { exportSuppliersToExcel, exportSuppliersToPDF } from "@/lib/export-utils";
 import { useQuery, useMutation } from "@tanstack/react-query";
+
+// Lazy load export utils for better performance
+const loadExportUtils = () => import("@/lib/export-utils");
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -162,14 +164,20 @@ export default function SuppliersList() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem 
-                onClick={() => exportSuppliersToExcel(suppliers)}
+                onClick={async () => {
+                  const { exportSuppliersToExcel } = await loadExportUtils();
+                  exportSuppliersToExcel(suppliers);
+                }}
                 data-testid="button-export-excel"
               >
                 <FileSpreadsheet className="h-4 w-4 ml-2" />
                 تصدير Excel
               </DropdownMenuItem>
               <DropdownMenuItem 
-                onClick={() => exportSuppliersToPDF(suppliers)}
+                onClick={async () => {
+                  const { exportSuppliersToPDF } = await loadExportUtils();
+                  exportSuppliersToPDF(suppliers);
+                }}
                 data-testid="button-export-pdf"
               >
                 <FileText className="h-4 w-4 ml-2" />

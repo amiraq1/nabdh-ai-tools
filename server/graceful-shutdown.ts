@@ -15,11 +15,19 @@ export function setupGracefulShutdown(httpServer: Server) {
 
     logger.info({ signal }, "Starting graceful shutdown");
 
+codex/conduct-inspection
     forceTimeout = setTimeout(() => {
       logger.error("Forceful shutdown after timeout");
       process.exit(1);
     }, 30000);
+    // Force shutdown after 30 seconds
+    forceTimeout = setTimeout(() => {
+      logger.error("Forceful shutdown after timeout");
+      process.exit(1);
+    }, 30_000);
 
+    // Stop accepting new connections
+main
     httpServer.close(async (err) => {
       logger.info({ err }, "HTTP server closed");
 
