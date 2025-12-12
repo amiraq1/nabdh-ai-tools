@@ -1,3 +1,6 @@
+// server/types.d.ts
+export {};
+
 declare module "pg" {
   export interface PoolConfig {
     connectionString?: string;
