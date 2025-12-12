@@ -15,7 +15,7 @@ export interface IStorage {
     profileImageUrl?: string | null;
   }): Promise<User>;
   getUsersCount(): Promise<number>;
-  getUsers(page?: number, limit?: number): Promise<{ users: User[]; total: number; page: number; limit: number; totalPages: number }>;
+  getUsers(page?: number, limit?: number): Promise<{ users: Omit<User, "password">[]; total: number; page: number; limit: number; totalPages: number }>;
   updateUserRole(id: string, role: string): Promise<User | undefined>;
   updateUserPassword(id: string, hashedPassword: string): Promise<User | undefined>;
   
@@ -114,7 +114,7 @@ export class DatabaseStorage implements IStorage {
       total,
       page,
       limit,
-      totalPages: Math.ceil(total / limit)
+      totalPages: Math.ceil(total / limit),
     };
   }
 
