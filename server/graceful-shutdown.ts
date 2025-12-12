@@ -2,10 +2,6 @@ import type { Server } from "http";
 import { pool } from "./db";
 import { logger } from "./logger";
 
-/**
- * Setup graceful shutdown handlers for the HTTP server
- * This ensures connections are closed properly when the app is terminated
- */
 export function setupGracefulShutdown(httpServer: Server) {
   let isShuttingDown = false;
   let forceTimeout: NodeJS.Timeout | null = null;
@@ -19,6 +15,11 @@ export function setupGracefulShutdown(httpServer: Server) {
 
     logger.info({ signal }, "Starting graceful shutdown");
 
+codex/conduct-inspection
+    forceTimeout = setTimeout(() => {
+      logger.error("Forceful shutdown after timeout");
+      process.exit(1);
+    }, 30000);
     // Force shutdown after 30 seconds
     forceTimeout = setTimeout(() => {
       logger.error("Forceful shutdown after timeout");
@@ -26,11 +27,11 @@ export function setupGracefulShutdown(httpServer: Server) {
     }, 30_000);
 
     // Stop accepting new connections
+main
     httpServer.close(async (err) => {
       logger.info({ err }, "HTTP server closed");
 
       try {
-        // Close database connections
         await pool.end();
         logger.info("Database connections closed");
 
