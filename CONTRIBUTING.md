@@ -23,12 +23,20 @@ If you have an idea for a new feature, please open an issue using the Feature Re
    cd nabdh-ai-tools
    ```
 
-2. **إنشاء فرع جديد / Create a new branch**
+2. **إعداد Node.js / Setup Node.js**
+   - المشروع يتطلب Node.js 20 أو أحدث / Project requires Node.js 20 or newer
+   - استخدم `.nvmrc` للتبديل التلقائي / Use `.nvmrc` for automatic switching:
+   ```bash
+   nvm use    # if using nvm
+   ```
+   - البيئة الموصى بها للتطوير: Node.js 20 / Recommended development environment: Node.js 20
+
+3. **إنشاء فرع جديد / Create a new branch**
    ```bash
    git checkout -b feature/your-feature-name
    ```
 
-3. **تثبيت التبعيات / Install dependencies**
+4. **تثبيت التبعيات / Install dependencies**
    ```bash
    pnpm install
    ```
