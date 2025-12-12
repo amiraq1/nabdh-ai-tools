@@ -1,3 +1,4 @@
+codex/investigate-github-actions-job-failure
 import { type Supplier, type InsertSupplier, type Transaction, type InsertTransaction, type User, type InsertUser, suppliers, transactions, users } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, sql, count } from "drizzle-orm";
@@ -97,8 +98,7 @@ export class DatabaseStorage implements IStorage {
     return Number(result?.count ?? 0);
   }
 
-  async getUsers(page: number = 1, limit: number = 20): Promise<{ users: Omit<User, "password">[]; total: number; page: number; limit: number; totalPages: number }> {
-    const offset = (page - 1) * limit;
+  async getUsers(page: number = 1, limit: number = 20): Promise<{ users: Omit<User, "password">[]; total: number; page: number; limit: number; totalPages: number }> { const offset = (page - 1) * limit;
     
     const [countResult] = await db.select({ total: count() }).from(users);
     const total = Number(countResult?.total ?? 0);
@@ -241,3 +241,53 @@ export class DatabaseStorage implements IStorage {
 }
 
 export const storage = new DatabaseStorage();
+
+diff --git a/server/storage.ts b/server/storage.ts
+index 1b7fefe890201996ff605f42949e2394fbcdfeaf..6bba02feab9667d0a3fd1cf971e4b757f272e75d 100644
+--- a/server/storage.ts
++++ b/server/storage.ts
+@@ -1,43 +1,43 @@
+ import { type Supplier, type InsertSupplier, type Transaction, type InsertTransaction, type User, type InsertUser, suppliers, transactions, users } from "@shared/schema";
+ import { db } from "./db";
+ import { eq, desc, sql, count } from "drizzle-orm";
+ import { sanitizeUsers } from "./user-sanitizer";
+ 
+ export interface IStorage {
+   getUser(id: string): Promise<User | undefined>;
+   getUserByEmail(email: string): Promise<User | undefined>;
+   createUser(user: InsertUser): Promise<User>;
+   upsertUser(user: {
+     id: string;
+     email?: string | null;
+     firstName?: string | null;
+     lastName?: string | null;
+     profileImageUrl?: string | null;
+   }): Promise<User>;
+   getUsersCount(): Promise<number>;
+-  getUsers(page?: number, limit?: number): Promise<{ users: User[]; total: number; page: number; limit: number; totalPages: number }>;
++  getUsers(page?: number, limit?: number): Promise<{ users: Omit<User, "password">[]; total: number; page: number; limit: number; totalPages: number }>;
+   updateUserRole(id: string, role: string): Promise<User | undefined>;
+   updateUserPassword(id: string, hashedPassword: string): Promise<User | undefined>;
+   
+   getSuppliers(): Promise<Supplier[]>;
+   getSupplier(id: string): Promise<Supplier | undefined>;
+   createSupplier(supplier: InsertSupplier): Promise<Supplier>;
+   updateSupplier(id: string, supplier: Partial<InsertSupplier>): Promise<Supplier | undefined>;
+   deleteSupplier(id: string): Promise<boolean>;
+   
+   getTransactions(): Promise<Transaction[]>;
+   getTransaction(id: string): Promise<Transaction | undefined>;
+   getTransactionsBySupplier(supplierId: string): Promise<Transaction[]>;
+   createTransaction(transaction: InsertTransaction): Promise<Transaction>;
+   deleteTransaction(id: string): Promise<boolean>;
+   deleteTransactionsBySupplier(supplierId: string): Promise<void>;
+ }
+ 
+ export class DatabaseStorage implements IStorage {
+   async getUser(id: string): Promise<User | undefined> {
+     const [user] = await db.select().from(users).where(eq(users.id, id));
+     return user || undefined;
+   }
+ 
+   async getUserByEmail(email: string): Promise<User | undefined> {
+     const [user] = await db.select().from(users).where(eq(users.email, email)); main
