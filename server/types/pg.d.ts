@@ -1,12 +1,20 @@
-// server/types.d.ts
-export {};
+declare module "pg" {
+  export interface PoolConfig {
+    connectionString?: string;
+    ssl?: unknown;
+    max?: number;
+    idleTimeoutMillis?: number;
+    connectionTimeoutMillis?: number;
+  }
 
-declare global {
-  namespace Express {
-    interface User {
-      id: string;
-      email?: string | null;
-      role?: string;
-    }
+  export class Pool {
+    constructor(config?: PoolConfig);
+    connect(): Promise<PoolClient>;
+    end(): Promise<void>;
+    query: (...args: unknown[]) => Promise<unknown>;
+  }
+
+  export interface PoolClient {
+    release?: () => void;
   }
 }
