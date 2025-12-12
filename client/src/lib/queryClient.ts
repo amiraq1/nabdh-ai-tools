@@ -2,9 +2,32 @@ import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
-    const text = (await res.text()) || res.statusText;
-    throw new Error(`${res.status}: ${text}`);
+    let errorMessage = res.statusText;
+    try {
+      const contentType = res.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        const json = await res.json();
+        errorMessage = json.message || JSON.stringify(json);
+      } else {
+        const text = await res.text();
+        errorMessage = text || res.statusText;
+      }
+    } catch (parseError) {
+      // If parsing fails, use statusText
+      if (process.env.NODE_ENV === "development") {
+        console.warn("Failed to parse error response:", parseError);
+      }
+      errorMessage = res.statusText;
+    }
+    throw new Error(`${res.status}: ${errorMessage}`);
   }
+}
+
+// Extract clean error message by removing status code prefix
+export function extractErrorMessage(error: Error | { message?: string }): string {
+  const message = error?.message || "";
+  // Remove status code prefix (e.g., "401: message" -> "message")
+  return message.replace(/^\d+:\s*/, "");
 }
 
 export async function apiRequest(

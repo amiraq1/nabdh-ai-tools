@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Heart, Loader2, Eye, EyeOff } from "lucide-react";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient, extractErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
 const loginSchema = z.object({
@@ -74,9 +74,10 @@ export default function Login() {
       navigate("/");
     },
     onError: (error: any) => {
+      const errorMessage = extractErrorMessage(error) || "تحقق من بياناتك وحاول مرة أخرى";
       toast({
         title: "فشل تسجيل الدخول",
-        description: error.message || "تحقق من بياناتك وحاول مرة أخرى",
+        description: errorMessage,
         variant: "destructive",
       });
     },
@@ -101,9 +102,10 @@ export default function Login() {
       navigate("/");
     },
     onError: (error: any) => {
+      const errorMessage = extractErrorMessage(error) || "تحقق من بياناتك وحاول مرة أخرى";
       toast({
         title: "فشل إنشاء الحساب",
-        description: error.message || "تحقق من بياناتك وحاول مرة أخرى",
+        description: errorMessage,
         variant: "destructive",
       });
     },
