@@ -12,6 +12,9 @@ vite.config.ts.*
 node20.zip
 node20/
 
+# Lock files (using pnpm only)
+package-lock.json
+
 # IDE settings (keep only shared settings)
 .vscode/*
 !.vscode/extensions.json
