@@ -8,7 +8,7 @@
 
 ابدأ من لوحة تحكم Railway الرئيسية. انقر على زر **"New Project"** للبدء.
 
-![الخطوة 1: إنشاء مشروع جديد](screenshot_01_new_project.png)
+![الخطوة 1: إنشاء مشروع جديد](docs/images/screenshot_01_new_project.png)
 
 ---
 
@@ -16,7 +16,7 @@
 
 ستظهر لك نافذة بها عدة خيارات. اختر **"Deploy from GitHub repo"** لربط حسابك على GitHub.
 
-![الخطوة 2: النشر من مستودع GitHub](screenshot_02_deploy_from_github.png)
+![الخطوة 2: النشر من مستودع GitHub](docs/images/screenshot_02_deploy_from_github.png)
 
 ---
 
@@ -24,7 +24,7 @@
 
 من قائمة مستودعاتك، اختر **`amiraq1/nabdh-ai-tools`**. ستبدأ Railway تلقائياً في عملية البناء والنشر الأولية.
 
-![الخطوة 3: اختيار المستودع الصحيح](screenshot_03_select_repo.png)
+![الخطوة 3: اختيار المستودع الصحيح](docs/images/screenshot_03_select_repo.png)
 
 ---
 
@@ -32,7 +32,7 @@
 
 بعد اكتمال النشر الأول، ستحتاج إلى إضافة قاعدة بيانات. في لوحة تحكم المشروع، انقر على زر **"New"** أو **"Add a service"**.
 
-![الخطوة 4: إضافة قاعدة بيانات](screenshot_04_add_database.png)
+![الخطوة 4: إضافة قاعدة بيانات](docs/images/screenshot_04_add_database.png)
 
 ---
 
@@ -40,7 +40,7 @@
 
 من الخيارات المتاحة، اختر **"Database"** ثم **"PostgreSQL"**. سيقوم Railway بإنشاء خدمة قاعدة بيانات جديدة وربطها بمشروعك.
 
-![الخطوة 5: اختيار قاعدة بيانات PostgreSQL](screenshot_05_select_postgres.png)
+![الخطوة 5: اختيار قاعدة بيانات PostgreSQL](docs/images/screenshot_05_select_postgres.png)
 
 ---
 
@@ -48,7 +48,7 @@
 
 الآن، افتح الخدمة الخاصة بتطبيقك (التي تحمل اسم `nabdh-ai-tools`) وانتقل إلى تبويب **"Variables"** لإضافة مفاتيح API والأسرار المطلوبة.
 
-![الخطوة 6: الانتقال إلى المتغيرات البيئية](screenshot_06_variables_tab.png)
+![الخطوة 6: الانتقال إلى المتغيرات البيئية](docs/images/screenshot_06_variables_tab.png)
 
 ---
 
@@ -62,7 +62,7 @@
 
 إذا كان مشروعك يحتاج متغيرات أخرى (مثل مفاتيح Google API)، أضفها هنا أيضاً.
 
-![الخطوة 7: إضافة المتغيرات وربط قاعدة البيانات](screenshot_07_link_database_url.png)
+![الخطوة 7: إضافة المتغيرات وربط قاعدة البيانات](docs/images/screenshot_07_link_database_url.png)
 
 ---
 
